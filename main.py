@@ -15,7 +15,6 @@ class world:
     def init_obj(self, obj):
         self.objs.add(obj)
         obj.forces.append(self.global_force)
-        obj.force_update = True
 
     def update(self):
         for obj in self.objs:
@@ -29,32 +28,21 @@ class world:
             
 
 class obj:
-    def __init__(self, world, mass = 1, pos = np.array([0,0]), speed = np.array([0,0]), forces = []):
+    def __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), forces = []):
 
         self.mass = mass
         self.pos = pos
+        self.new_pos = pos
         self.vel = speed
         self.forces = forces
         self.force_update = True
-        self.accel = 0
+        self.acc = np.array([0.0,0.0])
         
         self.world = world
         world.init_obj(self)
 
-    def pre_update(self, t):
-        
-        if self.force_update:
-            # Update acceleration with Newton's 2nd law of motion
-            new_force = sum(self.forces)
-            self.accel = net_force / self.mass
-            self.force_update = False
-
-        # Update velocity based on updated acceleration
-        self.vel = verlet_step
-        
-        # Update position based on updated velocity
-        new_pos = self.pos + self.vel*t
-        self.new_pos = new_pos
+    def pre_update(self, dt):
+        self.move(dt)
 
     def finish_update(self):
         self.pos = self.new_pos
@@ -62,14 +50,13 @@ class obj:
     def get_forces(self, world):
         return False
 
-
-    def verlet_step(self,dt, updated_forces=None):
+    def move(self,dt,):
         '''
         Velocity Verlet Algorithm to update x,v,a with global error of order 2.
         '''
         # Update position
         v_avg = self.vel + (.5 * self.acc * dt)
-        self.pos += v_avg * dt
+        self.new_pos += v_avg * dt
         
         # Update acceleration
         self.acc = sum(self.forces) / self.mass
