@@ -98,7 +98,7 @@ void draw_line(image* img, int x0, int y0, int x1, int y1) {
     }
     else if (dy == 0) {
         for (int i = 0; i < abs(dx); i++) {
-            draw_pixel(img, x0 + (sy*i), y0);
+            draw_pixel(img, x0 + (sx*i), y0);
         }
         return;
     }
@@ -113,9 +113,8 @@ void draw_line(image* img, int x0, int y0, int x1, int y1) {
 }
 
 void draw_polygon(image* img, int* points_x, int*points_y, int num_vertices, bool fill) {
-    
     int x0,y0,x1,y1;
-
+    
     for (int ind = 1; ind <= num_vertices; ind++) {
         x0 = *(points_x+ind-1);
         y0 = *(points_y+ind-1);
@@ -125,10 +124,26 @@ void draw_polygon(image* img, int* points_x, int*points_y, int num_vertices, boo
     }        
     
     if (fill) {
-        float center_x, center_y;
+        float center_x = 0;
+        float center_y = 0;
+        int next_x, next_y;
         for (int i = 0; i < num_vertices; i++) {
-            center_x = center_x + *(points_x + i);
-            center_y = center_y + *(points_y + i);
+
+            // These checks should make the fill-in work when the center of the 
+            // object is outside the bounds of img.
+            next_x = *(points_x + i);
+            if (next_x < 0)
+                next_x = -1;
+            if (next_x >= img->width)
+                next_x = img->width;
+            next_y = *(points_y + i);
+            if (next_y < 0)
+                next_y = -1;
+            if (next_y >= img->height)
+                next_y = img->height;
+
+            center_x = center_x + next_x;
+            center_y = center_y + next_y;
         }
         int center_px_x = (int) (center_x / num_vertices);
         int center_px_y = (int) (center_y / num_vertices);
@@ -168,25 +183,25 @@ image* spec_to_image(char* fname) {
 
     fscanf(fp, "%d,%d\n", &width, &height);
     image* img = init_image_empty(width, height);
+    
+    
+    
     while (!feof(fp)) {
-        fgets(shape, 7, fp);
-        printf("shape: %s\n", shape);
-        if (strcmp(shape, "circle") == 0) {
-            fscanf(fp, "%d,%d,%d", &x, &y, &rad);
-            printf("confirmed: circle(%d,%d,%d)\n",x,y,rad);
+        fgets(shape, 10, fp);
+        if (strcmp(shape, "circle\n") == 0) {
+            fscanf(fp, "%d,%d,%d\n", &x, &y, &rad);
             draw_circle(img, x, y, rad, 1);
         }
-        else if (strcmp(shape, "polygon") == 0) {
-            printf("confirmed: polygon\n");
+        else if (strcmp(shape, "polygon\n") == 0) {
             int sides;
-            fscanf(fp, "%d", &sides);
-            printf("polygon with %d sides.\n", sides);
+            fscanf(fp, "sides,%d\n", &sides);
+            printf("%d-sided polygon.\n", sides);
             int* xs = malloc(sides * sizeof(int));
             int* ys = malloc(sides * sizeof(int));
             for (int i = 0; i < sides; i++) {
-                fscanf(fp, "%d,%d", xs[i], ys[i]);
-                printf("coordinate (%d, %d)\n", xs[i], ys[i]);
+                fscanf(fp, "point,%d,%d\n", &(xs[i]), &(ys[i]));
             }
+            printf("%d-sided polygon.\n", sides);
             draw_polygon(img, xs, ys, sides, 1);
         }
         else
@@ -210,7 +225,6 @@ int main(int argc, char* argv[]) {
     image* img;    
     for (int ind = 0; ind < num_files; ind++) {
         sprintf(fname_in, "plane_%d.txt", ind);
-        printf("file name: %s\n", fname_in);
         sprintf(fname_out, "plane_%d.png", ind);
         img = spec_to_image(fname_in);
         save_image(img, fname_out);

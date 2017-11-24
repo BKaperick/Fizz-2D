@@ -174,7 +174,8 @@ class Polygon(Obj):
             world.init_obj(self)
     
     def __str__(self):
-        return "polygon\n" + str(len(self.points))+ "\n" + "\n".join([str(int(pt.pos[0])) + "," + str(int(pt.pos[1])) for pt in self.points]) + "\n"
+        # Note we leave out mass here since that is irrelevant to graphical representation at a fixed point in time.
+        return "polygon\nsides," + str(len(self.points))+ "\n" + "\n".join(["point," + str(int(pt.pos[0])) + "," + str(int(pt.pos[1])) for pt in self.points]) + "\n"
 
 
 class Ball(Obj):
@@ -199,10 +200,11 @@ class Ball(Obj):
             world.init_obj(self)
 
     def __str__(self):
-        return "circle\n" + str(int(self.pos[0])) + "," + str(int(self.pos[1])) + "," + str(self.radius) + "\n"
+        return "circle\n" + str(int(self.pos[0])) + "," + str(int(self.pos[1])) + "," + str(int(self.radius)) + "\n"
 
 
-class FixedObj(Polygon):
+
+class FixedPolygon(Polygon):
     def __init__(self, world = None, points = []):
         
         self.points = []
@@ -220,24 +222,64 @@ class FixedObj(Polygon):
         if world:
             world.init_fixed_obj(self)
         
-
-
-
-
+def read_input(fname):
+    with open(fname, "r") as f:
+        w, h = [int(x) for x in f.readline().strip().split(",")]
+        world = World(width=w, height = h)
+        current_shape = ""
+        for line in f.readlines():
+            if current_shape == "circle":
+                data = line.strip().split(",")
+                if data[0] == "mass":
+                    mass = float(data[1])
+                else:
+                    center_x = float(data[0])
+                    center_y = float(data[1])
+                    rad = float(data[2])
+                    obj = Ball(world, pos = np.array([center_x, center_y]), radius = rad)
+                    world.init_obj(obj)
+                    current_shape = ""
+            
+            elif current_shape == "polygon" or current_shape == "fixedpolygon":
+                data = line.strip().split(",")
+                if data[0] == "mass":
+                    mass = float(data[1])
+                elif data[0] == "sides":
+                    sides = int(data[1])
+                    npoints = sides
+                    points = []
+                elif data[0] == "point":
+                    npoints -= 1
+                    pp = np.array([float(_) for _ in data[1:]])
+                    point = Point(world, mass = mass / sides, pos = pp)
+                    points.append(point)
+                    if npoints == 0:
+                        if current_shape == "polygon":
+                            obj = Polygon(world, points = points, mass = mass)
+                        else:
+                            obj = FixedPolygon(world, points = points)
+                        world.init_obj(obj)
+                        current_shape = ""
+            else:
+                current_shape = line.strip()
+    return world
+            
 
 if __name__ == '__main__':
     
-    plane = World(width=100, height = 500)#gamma = np.array([0,1]))
-    ball = Ball(plane, pos=np.array([50.0, 100.0]), radius = 15)
-    floor = Polygon(plane, points = [
-        Point(plane, pos=np.array([0.0, plane.height])),
-        Point(plane, pos = np.array([100.0, plane.height])),
-        Point(plane, pos = np.array([100.0, plane.height-1])),
-        Point(plane, pos = np.array([0.0, plane.height-1]))])
-    
-
-    num_iters = int(argv[1])
+#    plane = World(width=100, height = 500)#gamma = np.array([0,1]))
+#    ball = Ball(plane, pos=np.array([50.0, 100.0]), radius = 15)
+#    floor = Polygon(plane, points = [
+#        Point(plane, pos=np.array([0.0, plane.height])),
+#        Point(plane, pos = np.array([100.0, plane.height])),
+#        Point(plane, pos = np.array([100.0, plane.height-1])),
+#        Point(plane, pos = np.array([0.0, plane.height-1]))])
+        
+    plane = read_input(argv[1])
+    num_iters = int(argv[2])
     for t in range(num_iters):
         plane.update()
+        for obj in plane.objs:
+            print(obj.pos)
         with open("plane_{0}.txt".format(t), "w") as f:
             f.write(str(plane))
