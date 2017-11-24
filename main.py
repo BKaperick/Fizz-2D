@@ -3,16 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-GRAVITY = np.array([0,-9.8])
+GRAVITY = np.array([0,.98])
 
-class world:
-    def __init__(self, objs = set(), global_force = GRAVITY, time_disc = 1, gamma = []):
+class World:
+    def __init__(self, width, height, objs = set(), global_force = GRAVITY, time_disc = 1, gamma = []):
         self.objs = set()
         self.time_disc = time_disc
         self.state = 0
         
         self.global_force = global_force
-        self.global_damping_force = None
+        self.global_damping_force = np.array([])
         if len(gamma) > 0:
             #self.global_damping_force = lambda v : gamma * v^2
             self.global_damping_force = gamma
@@ -23,18 +23,28 @@ class world:
     def init_obj(self, obj):
         self.objs.add(obj)
         #forces.append(self.global_force)
-        if len(self.global_damping_force) > 0:
+        if self.global_damping_force:
             obj.damping_force = True
 
     def update(self):
+
+        # Apply linear damping force if exists
+        if len(self.global_damping_force) == 0:
+            gdf = []
+        else:
+            gdf = [self.global_damping_force]
+        
+        # Do first pass of position, velocity and acceleration updates for each object in the world
         for obj in self.objs:
-            obj.pre_update([self.global_force], self.time_disc)
-#        update = self.check_collisions()
-#        for obj1,obj2 in update:
-#            self.collide_gracefully(obj1, obj2)
+            obj.pre_update([self.global_force], gdf, self.time_disc)
+        
+        # Do second (final) pass for each object in the world
         for obj in self.objs:
             obj.finish_update()
-        self.state += 1
+
+        # Advance time
+        self.state += self.time_disc
+
 
 class obj:
     def __init__(self, points = [], world = None, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
@@ -54,20 +64,53 @@ class obj:
         
         self.world = world
         world.init_obj(self)
-
     
-    def pre_update(self, dt, damping_force):
+    def pre_update(self, force, damping_force, dt):
         if damping_force:
-            update = self.com.linear_damping_move([world.global_force], dt)
-        else:
-            update = self.com.move([world.global_force], dt)
+            update_x, update_v, new_acc = self.com.linear_damping_move([self.world.global_force], dt)
+        
+            for i in range(len(self.points)):
+                self.points[i].pos += update_x
+                self.points[i].vel += update_v
+                self.points[i].acc = new_acc
 
-        for i in range(len(self.points)):
-            self.points[i] += update
+        if force:
+            update_x, update_v, new_acc = self.com.move([self.world.global_force], dt)
+        
+            for i in range(len(self.points)):
+                self.points[i].pos += update_x
+                self.points[i].vel += update_v
+                self.points[i].acc = new_acc
 
     def finish_update(self):
-        self.pos = self.new_pos
+        self.pos = self.com.new_pos
+        self.com.pos = self.com.new_pos
+        self.vel = self.com.vel
+        self.acc = self.com.acc
         
+
+class Ball(obj):
+    def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+        
+        self.points = []
+        self.com = point(world, pos = pos)
+        self.radius = radius
+        
+        self.mass = mass
+        
+        # Attributes of motion
+        self.pos = pos
+        self.new_pos = pos
+        self.vel = speed
+        self.acc = np.array([0.0,0.0])
+        self.rot_ang = rotation_angle
+        self.rot_spd = rotation_speed
+        
+        self.world = world
+        if world:
+            world.init_obj(self)
+        
+
 
 class point:
     def __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0])):
@@ -85,25 +128,38 @@ class point:
         '''
         Velocity Verlet Algorithm to update x,v,a with global error of order 2.
         '''
+        update_v = .5 * self.acc * dt
+        v_avg = self.vel + update_v
+
         # Update position
-        v_avg = self.vel + (.5 * self.acc * dt)
-        self.new_pos = self.pos + (v_avg * dt)
+        update_x = v_avg * dt
+        self.new_pos = self.pos + update_x
         
         # Update acceleration
-        self.acc = sum(forces) / self.mass
+        new_acc = sum(forces) / self.mass
+        self.acc = new_acc
         
         # Update velocity
+        update_v += .5 * self.acc * dt
         self.vel = v_avg + (.5 * self.acc * dt)
+        
+        return update_x, update_v, new_acc
+
 
     def linear_damping_move(self, forces, dt):
-        self.new_pos = self.pos + (dt * self.vel) + (.5 * (dt**2) * self.acc)
+        update_x = (dt * self.vel) + (.5 * (dt**2) * self.acc)
+        self.new_pos = self.pos + update_x
         
         tmp = dt * self.world.global_damping_force / (2 * self.mass)
         Fprev = self.acc * self.mass
         F = sum(forces)
-        self.vel = (1 / (1 + tmp)) * (self.vel * (1 -  tmp) + (dt / (2 * self.mass)) * (F + Fprev ))
-
+        update_v = (1 / (1 + tmp)) * (self.vel * (1 -  tmp) + (dt / (2 * self.mass)) * (F + Fprev )) - self.vel
+        self.vel += update_v
+        
+        new_acc = F / self.mass
         self.acc = F / self.mass
+
+        return update_x, update_v, new_acc
 
     
         
@@ -111,35 +167,15 @@ class point:
 
 
 if __name__ == '__main__':
-    plane = world(gamma = np.array([0,1]))
+    plane = World(width=100, height = 500)#gamma = np.array([0,1]))
     pt = point(plane)
-    ball = obj([pt], plane)
+    #ball = obj([pt], plane, pos=np.array([0.0, 100]))
+    ball = Ball(plane, pos=np.array([50.0, 100.0]), radius = 15)
     num_iters = int(argv[1])
-    
-    
-    plt.ion()
-    fig, ax = plt.subplots()
-
-    plot = ax.scatter([], [])
-    ax.set_xlim(-5, 5)
-    ax.set_ylim(-5, 5)
-
-
     for t in range(num_iters):
-        plt.figure(1)
-        plt.plot(*ball.pos,'-')
-        print(ball.pos)
-
-        # get the current points as numpy array with shape  (N, 2)
-        array = plot.get_offsets()
-
-        # add the points to the plot
-        array = np.append(array, ball.pos)
-        plot.set_offsets(array)
-
-        # update x and ylim to show all points:
-        ax.set_xlim(array[:, 0].min() - 0.5, array[:,0].max() + 0.5)
-        ax.set_ylim(array[:, 1].min() - 0.5, array[:, 1].max() + 0.5)
-        # update the figure
-        fig.canvas.draw()       
+        #print(ball.pos)
+        with open("plane_{0}.txt".format(t), "w") as f:
+            f.write("100,500\n")
+            f.write("circle\n{0},{1},{2}\n".format(int(ball.pos[0]), int(ball.pos[1]), int(ball.radius)))
         plane.update()
+        

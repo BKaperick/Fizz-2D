@@ -172,7 +172,6 @@ int write_png(FILE *outfile, int width, int height, unsigned char *rgb,
 				    (png_error_ptr) NULL, 
 				    (png_error_ptr) NULL);
   if (!png_ptr) {
-      printf("failed.\n");
       return(0);
   }
   
@@ -231,7 +230,6 @@ int write_png(FILE *outfile, int width, int height, unsigned char *rgb,
       free(rgba);
     }
 
-  printf("finishing png_write.\n");
   png_write_end(png_ptr, info_ptr);
   png_destroy_write_struct(&png_ptr, &info_ptr);
 

@@ -5,13 +5,17 @@ struct image {
 };
 typedef struct image image;
 
-void init_image_empty(image* img, int w, int h);
+image* init_image_empty(int w, int h);
 
-void init_image(image* img, int w, int h, float* px);
+image* init_image(int w, int h, float* px);
 
 void draw_pixel(image* img, int x, int y);
 
 void draw_circle(image* img, int center_x, int center_y, int radius, bool fill);
 
 void fill_shape(image* img, int x, int y);
+
+void save_img(image* img, char* fname);
+
+image* spec_to_image(char* fname);
 
