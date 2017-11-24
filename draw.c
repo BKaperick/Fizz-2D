@@ -190,7 +190,7 @@ image* spec_to_image(char* fname) {
         fgets(shape, 10, fp);
         if (strcmp(shape, "circle\n") == 0) {
             fscanf(fp, "%d,%d,%d\n", &x, &y, &rad);
-            draw_circle(img, x, y, rad, 1);
+            draw_circle(img, x, y, rad, 0);
         }
         else if (strcmp(shape, "polygon\n") == 0) {
             int sides;
@@ -202,7 +202,7 @@ image* spec_to_image(char* fname) {
                 fscanf(fp, "point,%d,%d\n", &(xs[i]), &(ys[i]));
             }
             printf("%d-sided polygon.\n", sides);
-            draw_polygon(img, xs, ys, sides, 1);
+            draw_polygon(img, xs, ys, sides, 0);
         }
         else
             return img;
@@ -219,7 +219,6 @@ void save_image(image* img, char* fname) {
 
 int main(int argc, char* argv[]) {
     int num_files = atoi(argv[1]);
-    //printf("%d\n", num_files);
     char* fname_in = malloc(11 * sizeof(char));
     char* fname_out = malloc(11 * sizeof(char));
     image* img;    

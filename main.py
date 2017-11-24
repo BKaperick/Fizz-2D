@@ -46,6 +46,7 @@ class World:
         
         # Do second (final) pass for each object in the world
         for obj in self.objs:
+            print(obj.name)
             obj.finish_update()
 
         # Advance time
@@ -105,6 +106,8 @@ class Obj:
 
 class Point:
     def __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0])):
+        
+        self.name = "point"
 
         self.mass = mass
         self.pos = pos
@@ -160,6 +163,7 @@ class Polygon(Obj):
         self.com = Point(world, pos = sum([pt.pos for pt in points]) / len(points))
         
         self.mass = mass
+        self.name = "polygon"
         
         # Attributes of motion
         self.pos = self.com.pos
@@ -181,6 +185,8 @@ class Polygon(Obj):
 class Ball(Obj):
     def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         
+        self.name = "circle"
+
         self.points = []
         self.com = Point(world, pos = pos)
         self.radius = radius
@@ -205,19 +211,9 @@ class Ball(Obj):
 
 
 class FixedPolygon(Polygon):
-    def __init__(self, world = None, points = []):
-        
-        self.points = []
-        self.com = Point(world, pos = sum([pt.pos for pt in self.points] / len(self.points)))
-        
-        self.mass = np.inf
-        
-        # Attributes of motion
-        self.pos = pos
-        self.new_pos = pos
-        self.vel = 0
-        self.acc = np.array([0.0,0.0])
-        
+    def __init__(self, world = None, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+        super().__init__(world = None, mass = np.inf, points = points, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
+        self.name = "fixedpolygon"        
         self.world = world
         if world:
             world.init_fixed_obj(self)
@@ -228,6 +224,8 @@ def read_input(fname):
         world = World(width=w, height = h)
         current_shape = ""
         for line in f.readlines():
+            if line.strip()[0] == "#":
+                continue
             if current_shape == "circle":
                 data = line.strip().split(",")
                 if data[0] == "mass":
@@ -237,11 +235,11 @@ def read_input(fname):
                     center_y = float(data[1])
                     rad = float(data[2])
                     obj = Ball(world, pos = np.array([center_x, center_y]), radius = rad)
-                    world.init_obj(obj)
                     current_shape = ""
             
             elif current_shape == "polygon" or current_shape == "fixedpolygon":
                 data = line.strip().split(",")
+                mass = np.inf
                 if data[0] == "mass":
                     mass = float(data[1])
                 elif data[0] == "sides":
@@ -254,11 +252,11 @@ def read_input(fname):
                     point = Point(world, mass = mass / sides, pos = pp)
                     points.append(point)
                     if npoints == 0:
+                        print(len(points))
                         if current_shape == "polygon":
                             obj = Polygon(world, points = points, mass = mass)
                         else:
                             obj = FixedPolygon(world, points = points)
-                        world.init_obj(obj)
                         current_shape = ""
             else:
                 current_shape = line.strip()
@@ -266,14 +264,6 @@ def read_input(fname):
             
 
 if __name__ == '__main__':
-    
-#    plane = World(width=100, height = 500)#gamma = np.array([0,1]))
-#    ball = Ball(plane, pos=np.array([50.0, 100.0]), radius = 15)
-#    floor = Polygon(plane, points = [
-#        Point(plane, pos=np.array([0.0, plane.height])),
-#        Point(plane, pos = np.array([100.0, plane.height])),
-#        Point(plane, pos = np.array([100.0, plane.height-1])),
-#        Point(plane, pos = np.array([0.0, plane.height-1]))])
         
     plane = read_input(argv[1])
     num_iters = int(argv[2])
