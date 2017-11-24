@@ -7,7 +7,10 @@ GRAVITY = np.array([0,.98])
 
 class World:
     def __init__(self, width, height, objs = set(), global_force = GRAVITY, time_disc = 1, gamma = []):
+        self.width = width
+        self.height = height
         self.objs = set()
+        self.fixed_objs = set()
         self.time_disc = time_disc
         self.state = 0
         
@@ -25,6 +28,9 @@ class World:
         #forces.append(self.global_force)
         if self.global_damping_force:
             obj.damping_force = True
+
+    def init_fixed_obj(self, obj):
+        self.fixed_objs.add(obj)
 
     def update(self):
 
@@ -45,8 +51,16 @@ class World:
         # Advance time
         self.state += self.time_disc
 
+    def __str__(self):
+        outstr = str(self.width) + "," + str(self.height) + "\n"
+        for obj in self.objs:
+            outstr += str(obj)
+        for obj in self.fixed_objs:
+            outstr += str(obj)
+        return outstr
 
-class obj:
+
+class Obj:
     def __init__(self, points = [], world = None, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         
         self.points = points
@@ -89,30 +103,7 @@ class obj:
         self.acc = self.com.acc
         
 
-class Ball(obj):
-    def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
-        
-        self.points = []
-        self.com = point(world, pos = pos)
-        self.radius = radius
-        
-        self.mass = mass
-        
-        # Attributes of motion
-        self.pos = pos
-        self.new_pos = pos
-        self.vel = speed
-        self.acc = np.array([0.0,0.0])
-        self.rot_ang = rotation_angle
-        self.rot_spd = rotation_speed
-        
-        self.world = world
-        if world:
-            world.init_obj(self)
-        
-
-
-class point:
+class Point:
     def __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0])):
 
         self.mass = mass
@@ -121,8 +112,8 @@ class point:
         self.vel = speed
 
         self.acc = np.array([0.0,0.0])
-        
         self.world = world
+
 
     def move(self, forces, dt):
         '''
@@ -161,21 +152,92 @@ class point:
 
         return update_x, update_v, new_acc
 
-    
+
+class Polygon(Obj):
+    def __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         
+        self.points = points
+        self.com = Point(world, pos = sum([pt.pos for pt in points]) / len(points))
+        
+        self.mass = mass
+        
+        # Attributes of motion
+        self.pos = self.com.pos
+        self.new_pos = self.pos
+        self.vel = speed
+        self.acc = np.array([0.0,0.0])
+        self.rot_ang = rotation_angle
+        self.rot_spd = rotation_speed
+        
+        self.world = world
+        if world:
+            world.init_obj(self)
+    
+    def __str__(self):
+        return "polygon\n" + str(len(self.points))+ "\n" + "\n".join([str(int(pt.pos[0])) + "," + str(int(pt.pos[1])) for pt in self.points]) + "\n"
+
+
+class Ball(Obj):
+    def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+        
+        self.points = []
+        self.com = Point(world, pos = pos)
+        self.radius = radius
+        
+        self.mass = mass
+        
+        # Attributes of motion
+        self.pos = pos
+        self.new_pos = pos
+        self.vel = speed
+        self.acc = np.array([0.0,0.0])
+        self.rot_ang = rotation_angle
+        self.rot_spd = rotation_speed
+        
+        self.world = world
+        if world:
+            world.init_obj(self)
+
+    def __str__(self):
+        return "circle\n" + str(int(self.pos[0])) + "," + str(int(self.pos[1])) + "," + str(self.radius) + "\n"
+
+
+class FixedObj(Polygon):
+    def __init__(self, world = None, points = []):
+        
+        self.points = []
+        self.com = Point(world, pos = sum([pt.pos for pt in self.points] / len(self.points)))
+        
+        self.mass = np.inf
+        
+        # Attributes of motion
+        self.pos = pos
+        self.new_pos = pos
+        self.vel = 0
+        self.acc = np.array([0.0,0.0])
+        
+        self.world = world
+        if world:
+            world.init_fixed_obj(self)
+        
+
+
 
 
 
 if __name__ == '__main__':
+    
     plane = World(width=100, height = 500)#gamma = np.array([0,1]))
-    pt = point(plane)
-    #ball = obj([pt], plane, pos=np.array([0.0, 100]))
     ball = Ball(plane, pos=np.array([50.0, 100.0]), radius = 15)
+    floor = Polygon(plane, points = [
+        Point(plane, pos=np.array([0.0, plane.height])),
+        Point(plane, pos = np.array([100.0, plane.height])),
+        Point(plane, pos = np.array([100.0, plane.height-1])),
+        Point(plane, pos = np.array([0.0, plane.height-1]))])
+    
+
     num_iters = int(argv[1])
     for t in range(num_iters):
-        #print(ball.pos)
-        with open("plane_{0}.txt".format(t), "w") as f:
-            f.write("100,500\n")
-            f.write("circle\n{0},{1},{2}\n".format(int(ball.pos[0]), int(ball.pos[1]), int(ball.radius)))
         plane.update()
-        
+        with open("plane_{0}.txt".format(t), "w") as f:
+            f.write(str(plane))

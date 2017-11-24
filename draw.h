@@ -19,3 +19,6 @@ void save_img(image* img, char* fname);
 
 image* spec_to_image(char* fname);
 
+void draw_line(image* img, int x0, int y0, int x1, int y1);
+
+void draw_polygon(image* img, int* points_x, int*points_y, int num_vertices, bool fill);

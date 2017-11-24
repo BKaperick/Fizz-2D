@@ -84,6 +84,58 @@ void draw_circle(image* img, int center_x, int center_y, int radius, bool fill) 
     }
 }
 
+void draw_line(image* img, int x0, int y0, int x1, int y1) {
+
+    int dx =  abs(x1-x0), sx = x0<x1 ? 1 : -1;
+    int dy = -abs(y1-y0), sy = y0<y1 ? 1 : -1; 
+    int err = dx+dy, e2; /* error value e_xy */
+
+    if (dx == 0) {
+        for (int i = 0; i < abs(dy); i++) {
+            draw_pixel(img, x0, y0 + (sy*i));
+        }
+        return;
+    }
+    else if (dy == 0) {
+        for (int i = 0; i < abs(dx); i++) {
+            draw_pixel(img, x0 + (sy*i), y0);
+        }
+        return;
+    }
+ 
+    for(;;){  /* loop */
+        draw_pixel(img, x0, y0);
+        if (x0==x1 && y0==y1) break;
+        e2 = 2*err;
+        if (e2 >= dy) { err += dy; x0 += sx; } /* e_xy+e_x > 0 */
+        if (e2 <= dx) { err += dx; y0 += sy; } /* e_xy+e_y < 0 */
+    }
+}
+
+void draw_polygon(image* img, int* points_x, int*points_y, int num_vertices, bool fill) {
+    
+    int x0,y0,x1,y1;
+
+    for (int ind = 1; ind <= num_vertices; ind++) {
+        x0 = *(points_x+ind-1);
+        y0 = *(points_y+ind-1);
+        x1 = *(points_x+(ind%num_vertices));
+        y1 = *(points_y+(ind%num_vertices));
+        draw_line(img, x0, y0, x1, y1);
+    }        
+    
+    if (fill) {
+        float center_x, center_y;
+        for (int i = 0; i < num_vertices; i++) {
+            center_x = center_x + *(points_x + i);
+            center_y = center_y + *(points_y + i);
+        }
+        int center_px_x = (int) (center_x / num_vertices);
+        int center_px_y = (int) (center_y / num_vertices);
+        fill_shape(img, center_px_x, center_px_y);
+    }
+}
+
 void fill_shape(image* img, int x, int y) {
     /*
      * Classic recursive implementation of flood fill.
@@ -118,10 +170,27 @@ image* spec_to_image(char* fname) {
     image* img = init_image_empty(width, height);
     while (!feof(fp)) {
         fgets(shape, 7, fp);
-        if (strcmp(shape, "circle")) {
+        printf("shape: %s\n", shape);
+        if (strcmp(shape, "circle") == 0) {
             fscanf(fp, "%d,%d,%d", &x, &y, &rad);
+            printf("confirmed: circle(%d,%d,%d)\n",x,y,rad);
             draw_circle(img, x, y, rad, 1);
         }
+        else if (strcmp(shape, "polygon") == 0) {
+            printf("confirmed: polygon\n");
+            int sides;
+            fscanf(fp, "%d", &sides);
+            printf("polygon with %d sides.\n", sides);
+            int* xs = malloc(sides * sizeof(int));
+            int* ys = malloc(sides * sizeof(int));
+            for (int i = 0; i < sides; i++) {
+                fscanf(fp, "%d,%d", xs[i], ys[i]);
+                printf("coordinate (%d, %d)\n", xs[i], ys[i]);
+            }
+            draw_polygon(img, xs, ys, sides, 1);
+        }
+        else
+            return img;
     }
     return img;
 }
@@ -141,9 +210,11 @@ int main(int argc, char* argv[]) {
     image* img;    
     for (int ind = 0; ind < num_files; ind++) {
         sprintf(fname_in, "plane_%d.txt", ind);
+        printf("file name: %s\n", fname_in);
         sprintf(fname_out, "plane_%d.png", ind);
         img = spec_to_image(fname_in);
         save_image(img, fname_out);
+        printf("processed image %d.\n", ind);
     }
 	return 0;
 }
