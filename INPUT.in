@@ -3,7 +3,7 @@ circle
 50,50,15.0
 mass,1
 polygon
-mass,5
+mass,10
 sides,4
 point,5,5
 point,95,5

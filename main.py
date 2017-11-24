@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 GRAVITY = np.array([0,.98])
 
 class World:
-    def __init__(self, width, height, objs = set(), global_force = GRAVITY, time_disc = 1, gamma = []):
+    def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = []):
         self.width = width
         self.height = height
         self.objs = set()
@@ -14,7 +14,7 @@ class World:
         self.time_disc = time_disc
         self.state = 0
         
-        self.global_force = global_force
+        self.global_accel = global_accel
         self.global_damping_force = np.array([])
         if len(gamma) > 0:
             #self.global_damping_force = lambda v : gamma * v^2
@@ -42,11 +42,10 @@ class World:
         
         # Do first pass of position, velocity and acceleration updates for each object in the world
         for obj in self.objs:
-            obj.pre_update([self.global_force], gdf, self.time_disc)
+            obj.pre_update([], gdf, self.time_disc)
         
         # Do second (final) pass for each object in the world
         for obj in self.objs:
-            print(obj.name)
             obj.finish_update()
 
         # Advance time
@@ -61,11 +60,12 @@ class World:
         return outstr
 
 
+
 class Obj:
     def __init__(self, points = [], world = None, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         
         self.points = points
-        self.com = point(world, pos = sum([pt.pos for pt in points]) / len(points))
+        self.com = Point(world, pos = sum([pt.pos for pt in points]) / len(points), mass = mass)
         
         self.mass = mass
         
@@ -78,24 +78,23 @@ class Obj:
         self.rot_spd = rotation_speed
         
         self.world = world
-        world.init_obj(self)
+        if world:
+            world.init_obj(self)
     
     def pre_update(self, force, damping_force, dt):
         if damping_force:
-            update_x, update_v, new_acc = self.com.linear_damping_move([self.world.global_force], dt)
+            update_x, update_v, new_acc = self.com.linear_damping_move([], dt)
         
             for i in range(len(self.points)):
                 self.points[i].pos += update_x
                 self.points[i].vel += update_v
                 self.points[i].acc = new_acc
-
-        if force:
-            update_x, update_v, new_acc = self.com.move([self.world.global_force], dt)
-        
-            for i in range(len(self.points)):
-                self.points[i].pos += update_x
-                self.points[i].vel += update_v
-                self.points[i].acc = new_acc
+        #update_x, update_v, new_acc = self.com.move([self.world.global_force], dt)
+        update_x, update_v, new_acc = self.com.move(force, dt)
+        for i in range(len(self.points)):
+            self.points[i].pos += update_x
+            self.points[i].vel += update_v
+            self.points[i].acc = new_acc
 
     def finish_update(self):
         self.pos = self.com.new_pos
@@ -124,13 +123,13 @@ class Point:
         '''
         update_v = .5 * self.acc * dt
         v_avg = self.vel + update_v
-
+        
         # Update position
         update_x = v_avg * dt
         self.new_pos = self.pos + update_x
         
         # Update acceleration
-        new_acc = sum(forces) / self.mass
+        new_acc = (sum(forces) / self.mass) + self.world.global_accel
         self.acc = new_acc
         
         # Update velocity
@@ -159,23 +158,9 @@ class Point:
 class Polygon(Obj):
     def __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         
-        self.points = points
-        self.com = Point(world, pos = sum([pt.pos for pt in points]) / len(points))
-        
-        self.mass = mass
+        super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
         
-        # Attributes of motion
-        self.pos = self.com.pos
-        self.new_pos = self.pos
-        self.vel = speed
-        self.acc = np.array([0.0,0.0])
-        self.rot_ang = rotation_angle
-        self.rot_spd = rotation_speed
-        
-        self.world = world
-        if world:
-            world.init_obj(self)
     
     def __str__(self):
         # Note we leave out mass here since that is irrelevant to graphical representation at a fixed point in time.
@@ -188,7 +173,7 @@ class Ball(Obj):
         self.name = "circle"
 
         self.points = []
-        self.com = Point(world, pos = pos)
+        self.com = Point(world, pos = pos, mass = mass)
         self.radius = radius
         
         self.mass = mass
@@ -239,7 +224,6 @@ def read_input(fname):
             
             elif current_shape == "polygon" or current_shape == "fixedpolygon":
                 data = line.strip().split(",")
-                mass = np.inf
                 if data[0] == "mass":
                     mass = float(data[1])
                 elif data[0] == "sides":
@@ -252,7 +236,6 @@ def read_input(fname):
                     point = Point(world, mass = mass / sides, pos = pp)
                     points.append(point)
                     if npoints == 0:
-                        print(len(points))
                         if current_shape == "polygon":
                             obj = Polygon(world, points = points, mass = mass)
                         else:
@@ -260,6 +243,7 @@ def read_input(fname):
                         current_shape = ""
             else:
                 current_shape = line.strip()
+                mass = np.inf
     return world
             
 
@@ -270,6 +254,6 @@ if __name__ == '__main__':
     for t in range(num_iters):
         plane.update()
         for obj in plane.objs:
-            print(obj.pos)
+            print(obj.name, obj.pos, obj.world.global_accel)
         with open("plane_{0}.txt".format(t), "w") as f:
             f.write(str(plane))
