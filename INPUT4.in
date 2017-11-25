@@ -1,0 +1,14 @@
+400,400
+fixedpolygon
+sides,4
+point,1,399
+point,399,399
+point,399,299
+point,1,299
+polygon
+sides,4
+mass,5
+point,40,70
+point,50,70
+point,50,60
+point,40,60

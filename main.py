@@ -4,7 +4,7 @@ from math import acos
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-GRAVITY = np.array([0.0,.98])
+GRAVITY = np.array([0.1,.2])
 
 class World:
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = []):
@@ -51,7 +51,7 @@ class World:
                 if obj1.is_fixed:
                     obj1,obj2 = obj2,obj1
                     #c_vec_normal = -1 * c_vec_normal
-                c_vec = c_vec_normal * (c_vec_mag + 1e-3)
+                c_vec = c_vec_normal * (c_vec_mag + 1e-7)
                 print("COLLISION", c_vec, f1, f2)
                 if f2 == 1:
                     c_vec *= -1
