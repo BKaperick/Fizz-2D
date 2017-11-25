@@ -1,16 +1,17 @@
 from sys import argv
 import numpy as np
+from math import acos
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-GRAVITY = np.array([0,.98])
+GRAVITY = np.array([0.0,.98])
 
 class World:
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = []):
         self.width = width
         self.height = height
-        self.objs = set()
-        self.fixed_objs = set()
+        self.objs = []
+        self.fixed_objs = []
         self.time_disc = time_disc
         self.state = 0
         
@@ -24,13 +25,13 @@ class World:
             self.init_obj(obj)
     
     def init_obj(self, obj):
-        self.objs.add(obj)
+        self.objs.append(obj)
         #forces.append(self.global_force)
         if self.global_damping_force:
             obj.damping_force = True
 
     def init_fixed_obj(self, obj):
-        self.fixed_objs.add(obj)
+        self.fixed_objs.append(obj)
 
     def update(self):
 
@@ -44,6 +45,75 @@ class World:
         for obj in self.objs:
             obj.pre_update([], gdf, self.time_disc)
         
+        collisions = self.check_collisions()
+        if collisions:
+            print("COLLISION")
+        while collisions:
+            for obj1, obj2, c_vec in collisions:
+                print("init acc: ", obj1.com.acc)
+                if obj1.is_fixed:
+                    obj1,obj2 = obj2,obj1
+                    c_vec = -1 * c_vec
+                print(c_vec)
+                c_vec_normal = c_vec / np.linalg.norm(c_vec)
+                c_vec = c_vec *(1 + 1e-3)
+#                
+#                mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
+#                if np.isnan(mass_prop):
+#                    mass_prop = 0
+                
+                if obj2.is_fixed:
+                    #self.forces.append(obj1.mass * 
+                    for i in range(len(obj1.points)):
+                        #print("updates: ", c_vec, np.dot(obj1.points[i].vel, c_vec))
+                        obj1.points[i].pos += c_vec
+                        #obj1.points[i].vel -= c_vec*np.dot(obj1.points[i].vel, c_vec)
+                        #obj1.points[i].acc -= c_vec*np.dot(obj1.points[i].acc, c_vec)
+                        
+                        vdotN = np.dot(obj1.points[i].vel, c_vec_normal)
+                        #vnorm = np.linalg.norm(obj1.points[i].vel)
+                        #print(vdotN, vnorm, vdotN/vnorm)
+                        #obj1.points[i].vel += np.array([vdotN, vnorm * np.sin(acos(vdotN / vnorm))])
+                        #obj1.points[i].vel += np.array([vnorm * np.sin(acos(vdotN / vnorm)), vdotN])
+                        obj1.points[i].vel -= 2*vdotN * c_vec_normal
+                        
+                        adotN = np.dot(obj1.points[i].acc, c_vec_normal)
+                        #anorm = np.linalg.norm(obj1.points[i].acc)
+                        #obj1.points[i].acc += np.array([adotN, anorm * np.sin(acos(adotN / anorm))])
+                        #obj1.points[i].acc += np.array([anorm * np.sin(acos(adotN / anorm)), adotN])
+                        obj1.points[i].acc -= 2*adotN * c_vec_normal
+
+                    obj1.com.new_pos += c_vec
+                    
+                    vdotN = np.dot(obj1.com.vel, c_vec_normal)
+                    #vnorm = np.linalg.norm(obj1.com.vel)
+                    #obj1.com.vel += np.array([vdotN, vnorm * np.sin(acos(vdotN / vnorm))])
+                    #obj1.com.vel += np.array([vnorm * np.sin(acos(vdotN / vnorm)), vdotN])
+                    obj1.com.vel -= 2*vdotN * c_vec_normal
+                    
+                    adotN = np.dot(obj1.com.acc, c_vec_normal)
+                    #anorm = np.linalg.norm(obj1.com.acc)
+                    #obj1.com.acc -= np.array([adotN, anorm * np.sin(acos(adotN / anorm))])
+                    #obj1.com.acc -= np.array([anorm * np.sin(acos(adotN / anorm)), adotN])
+                    obj1.com.acc -= 2*adotN * c_vec_normal
+                    
+                    obj1.finish_update()
+                    obj2.finish_update()
+
+                else:
+                    obj1.com.new_pos += (1-mass_prop) * (c_vec)
+                    for i in range(len(obj1.points)):
+                        obj1.points[i].pos += (1-mass_prop) * (c_vec)
+                        
+                    obj1.finish_update()
+                    
+                    obj2.com.new_pos -= mass_prop * c_vec
+                    for i in range(len(obj2.points)):
+                        obj2.points[i].pos -= mass_prop * (c_vec)
+                    obj2.finish_update()
+            collisions = self.check_collisions()
+            #exit()
+
         # Do second (final) pass for each object in the world
         for obj in self.objs:
             obj.finish_update()
@@ -51,6 +121,19 @@ class World:
         # Advance time
         self.state += self.time_disc
 
+    def check_collisions(self):
+        collisions = []
+        objects = [o for o in self.objs + self.fixed_objs if o.name == "polygon" or o.name == "fixedpolygon"]
+        for i,obj in enumerate(objects):
+            for other_obj in objects[i+1:]:
+                correction = polypoly_collision(obj, other_obj)
+                if len(correction) > 0:
+                    collisions.append((obj, other_obj, correction))
+        return collisions
+
+                        
+
+    
     def __str__(self):
         outstr = str(self.width) + "," + str(self.height) + "\n"
         for obj in self.objs:
@@ -76,31 +159,40 @@ class Obj:
         self.acc = np.array([0.0,0.0])
         self.rot_ang = rotation_angle
         self.rot_spd = rotation_speed
+
+        self.update_x = 0.0
+        self.update_v = 0.0
+        self.new_acc = 0.0
         
         self.world = world
         if world:
             world.init_obj(self)
+
+        self.is_fixed = False
     
     def pre_update(self, force, damping_force, dt):
         if damping_force:
             update_x, update_v, new_acc = self.com.linear_damping_move([], dt)
         
-            for i in range(len(self.points)):
-                self.points[i].pos += update_x
-                self.points[i].vel += update_v
-                self.points[i].acc = new_acc
-        #update_x, update_v, new_acc = self.com.move([self.world.global_force], dt)
-        update_x, update_v, new_acc = self.com.move(force, dt)
+#            for i in range(len(self.points)):
+#                self.points[i].pos += update_x
+#                self.points[i].vel += update_v
+#                self.points[i].acc = new_acc
+        self.update_x, self.update_v, self.new_acc = self.com.move(force, dt)
         for i in range(len(self.points)):
-            self.points[i].pos += update_x
-            self.points[i].vel += update_v
-            self.points[i].acc = new_acc
+            self.points[i].pos += self.update_x
+            self.points[i].vel += self.update_v
+            self.points[i].acc = np.array(self.new_acc, copy=True)
 
     def finish_update(self):
-        self.pos = self.com.new_pos
-        self.com.pos = self.com.new_pos
-        self.vel = self.com.vel
-        self.acc = self.com.acc
+        self.pos = np.array(self.com.new_pos, copy=True)
+        self.com.pos = np.array(self.com.new_pos, copy=True)
+        self.vel = np.array(self.com.vel, copy=True)
+        self.acc = np.array(self.com.acc, copy=True)
+#        for i in range(len(self.points)):
+#            self.points[i].pos += self.update_x
+#            self.points[i].vel += self.update_v
+#            self.points[i].acc = self.new_acc
         
 
 class Point:
@@ -202,6 +294,7 @@ class FixedPolygon(Polygon):
         self.world = world
         if world:
             world.init_fixed_obj(self)
+        self.is_fixed = True
         
 def read_input(fname):
     with open(fname, "r") as f:
@@ -245,7 +338,56 @@ def read_input(fname):
                 current_shape = line.strip()
                 mass = np.inf
     return world
+
+def polypoly_collision(poly1, poly2):
+    poly1_edges = list(zip(poly1.points[:-1], poly1.points[1:])) + [(poly1.points[-1], poly1.points[0])]
+    poly1_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly1_edges]
+    
+    poly2_edges = list(zip(poly2.points[:-1], poly2.points[1:])) + [(poly2.points[-1], poly2.points[0])]
+    poly2_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly2_edges]
+    
+
+    overlap = np.inf
+    for axis in poly1_normals + poly2_normals:
+        
+        # Normalize
+        normal_axis = axis / np.linalg.norm(axis)
+        
+        poly1_bounds = [np.dot(normal_axis, poly1.points[0].pos)]*2
+        poly2_bounds = [np.dot(normal_axis, poly2.points[0].pos)]*2
+
+        for point in poly1.points:
+            curr = np.dot(normal_axis, point.pos)
+            if curr < poly1_bounds[0]:
+                poly1_bounds[0] = curr
+            if curr > poly1_bounds[1]:
+                poly1_bounds[1] = curr
+        
+        for point in poly2.points:
+            curr = np.dot(normal_axis, point.pos)
+            if curr < poly2_bounds[0]:
+                poly2_bounds[0] = curr
+            if curr > poly2_bounds[1]:
+                poly2_bounds[1] = curr
+        
+        if poly1_bounds[0] > poly2_bounds[0]:
+            poly1_bounds,poly2_bounds = poly2_bounds, poly1_bounds
             
+        #If a single check fails, then there is no collision
+        if poly1_bounds[1] < poly2_bounds[0]:
+            return []
+        
+        # Save axis and overlap magnitude if this is the smallest gap
+        current_overlap = poly1_bounds[1] - poly2_bounds[0]
+        if current_overlap < overlap:
+            fix_axis = normal_axis
+            overlap = current_overlap
+
+    bounceback_displacement = fix_axis * overlap
+    return bounceback_displacement
+    
+
+
 
 if __name__ == '__main__':
         
@@ -253,7 +395,7 @@ if __name__ == '__main__':
     num_iters = int(argv[2])
     for t in range(num_iters):
         plane.update()
-        for obj in plane.objs:
-            print(obj.name, obj.pos, obj.world.global_accel)
+        for i,obj in enumerate(plane.objs):
+            print(obj.name,i, obj.pos, obj.vel, obj.acc)
         with open("plane_{0}.txt".format(t), "w") as f:
             f.write(str(plane))
