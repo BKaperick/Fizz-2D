@@ -46,56 +46,40 @@ class World:
             obj.pre_update([], gdf, self.time_disc)
         
         collisions = self.check_collisions()
-        if collisions:
-            print("COLLISION")
         while collisions:
-            for obj1, obj2, c_vec in collisions:
-                print("init acc: ", obj1.com.acc)
+            for obj1, obj2, c_vec_normal, c_vec_mag, f1, f2 in collisions:
                 if obj1.is_fixed:
                     obj1,obj2 = obj2,obj1
-                    c_vec = -1 * c_vec
-                print(c_vec)
-                c_vec_normal = c_vec / np.linalg.norm(c_vec)
-                c_vec = c_vec *(1 + 1e-3)
+                    #c_vec_normal = -1 * c_vec_normal
+                c_vec = c_vec_normal * (c_vec_mag + 1e-3)
+                print("COLLISION", c_vec, f1, f2)
+                if f2 == 1:
+                    c_vec *= -1
+                    c_vec_normal *= -1
 #                
-#                mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
-#                if np.isnan(mass_prop):
-#                    mass_prop = 0
+                mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
+                if np.isnan(mass_prop):
+                    mass_prop = 0
                 
                 if obj2.is_fixed:
                     #self.forces.append(obj1.mass * 
                     for i in range(len(obj1.points)):
                         #print("updates: ", c_vec, np.dot(obj1.points[i].vel, c_vec))
                         obj1.points[i].pos += c_vec
-                        #obj1.points[i].vel -= c_vec*np.dot(obj1.points[i].vel, c_vec)
-                        #obj1.points[i].acc -= c_vec*np.dot(obj1.points[i].acc, c_vec)
                         
                         vdotN = np.dot(obj1.points[i].vel, c_vec_normal)
-                        #vnorm = np.linalg.norm(obj1.points[i].vel)
-                        #print(vdotN, vnorm, vdotN/vnorm)
-                        #obj1.points[i].vel += np.array([vdotN, vnorm * np.sin(acos(vdotN / vnorm))])
-                        #obj1.points[i].vel += np.array([vnorm * np.sin(acos(vdotN / vnorm)), vdotN])
                         obj1.points[i].vel -= 2*vdotN * c_vec_normal
                         
-                        adotN = np.dot(obj1.points[i].acc, c_vec_normal)
-                        #anorm = np.linalg.norm(obj1.points[i].acc)
-                        #obj1.points[i].acc += np.array([adotN, anorm * np.sin(acos(adotN / anorm))])
-                        #obj1.points[i].acc += np.array([anorm * np.sin(acos(adotN / anorm)), adotN])
-                        obj1.points[i].acc -= 2*adotN * c_vec_normal
+                        #adotN = np.dot(obj1.points[i].acc, c_vec_normal)
+                        #obj1.points[i].acc -= 2*adotN * c_vec_normal
 
                     obj1.com.new_pos += c_vec
                     
                     vdotN = np.dot(obj1.com.vel, c_vec_normal)
-                    #vnorm = np.linalg.norm(obj1.com.vel)
-                    #obj1.com.vel += np.array([vdotN, vnorm * np.sin(acos(vdotN / vnorm))])
-                    #obj1.com.vel += np.array([vnorm * np.sin(acos(vdotN / vnorm)), vdotN])
                     obj1.com.vel -= 2*vdotN * c_vec_normal
                     
-                    adotN = np.dot(obj1.com.acc, c_vec_normal)
-                    #anorm = np.linalg.norm(obj1.com.acc)
-                    #obj1.com.acc -= np.array([adotN, anorm * np.sin(acos(adotN / anorm))])
-                    #obj1.com.acc -= np.array([anorm * np.sin(acos(adotN / anorm)), adotN])
-                    obj1.com.acc -= 2*adotN * c_vec_normal
+                    #adotN = np.dot(obj1.com.acc, c_vec_normal)
+                    #obj1.com.acc -= 2*adotN * c_vec_normal
                     
                     obj1.finish_update()
                     obj2.finish_update()
@@ -126,14 +110,11 @@ class World:
         objects = [o for o in self.objs + self.fixed_objs if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
-                correction = polypoly_collision(obj, other_obj)
+                correction, correct_mag, f1, f2 = polypoly_collision(obj, other_obj)
                 if len(correction) > 0:
-                    collisions.append((obj, other_obj, correction))
+                    collisions.append((obj, other_obj, correction, correct_mag, f1, f2))
         return collisions
 
-                        
-
-    
     def __str__(self):
         outstr = str(self.width) + "," + str(self.height) + "\n"
         for obj in self.objs:
@@ -141,7 +122,6 @@ class World:
         for obj in self.fixed_objs:
             outstr += str(obj)
         return outstr
-
 
 
 class Obj:
@@ -348,7 +328,7 @@ def polypoly_collision(poly1, poly2):
     
 
     overlap = np.inf
-    for axis in poly1_normals + poly2_normals:
+    for axis,flag in list(zip(poly1_normals,[1]*len(poly1_normals))) + list(zip(poly2_normals, [2]*len(poly2_normals))):
         
         # Normalize
         normal_axis = axis / np.linalg.norm(axis)
@@ -370,23 +350,27 @@ def polypoly_collision(poly1, poly2):
             if curr > poly2_bounds[1]:
                 poly2_bounds[1] = curr
         
+        mag_flag = 1
+        
         if poly1_bounds[0] > poly2_bounds[0]:
+            mag_flag = 2
             poly1_bounds,poly2_bounds = poly2_bounds, poly1_bounds
             
         #If a single check fails, then there is no collision
         if poly1_bounds[1] < poly2_bounds[0]:
-            return []
+            return [],None,None,None
         
         # Save axis and overlap magnitude if this is the smallest gap
         current_overlap = poly1_bounds[1] - poly2_bounds[0]
         if current_overlap < overlap:
             fix_axis = normal_axis
+            fix_flag = flag
+            fix_mag_flag = mag_flag
             overlap = current_overlap
 
-    bounceback_displacement = fix_axis * overlap
-    return bounceback_displacement
-    
-
+    #bounceback_displacement = fix_axis * overlap
+    return fix_axis, overlap, fix_flag, fix_mag_flag
+    #return bounceback_displacement
 
 
 if __name__ == '__main__':

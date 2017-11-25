@@ -53,7 +53,7 @@ void draw_circle(image* img, int center_x, int center_y, int radius, bool fill) 
     int dx = 1;
     int dy = 1;
     int err = dx - (radius << 1);
-    
+    printf("center (%d, %d)\n", center_x, center_y);
     while (x >= y)
     {
         draw_pixel(img, center_x + x, center_y + y);
@@ -195,14 +195,12 @@ image* spec_to_image(char* fname) {
         else if (strcmp(shape, "polygon\n") == 0) {
             int sides;
             fscanf(fp, "sides,%d\n", &sides);
-            printf("%d-sided polygon.\n", sides);
             int* xs = malloc(sides * sizeof(int));
             int* ys = malloc(sides * sizeof(int));
             for (int i = 0; i < sides; i++) {
                 fscanf(fp, "point,%d,%d\n", &(xs[i]), &(ys[i]));
             }
-            printf("%d-sided polygon.\n", sides);
-            draw_polygon(img, xs, ys, sides, 0);
+            draw_polygon(img, xs, ys, sides, 1);
         }
         else
             return img;
@@ -227,7 +225,7 @@ int main(int argc, char* argv[]) {
         sprintf(fname_out, "plane_%d.png", ind);
         img = spec_to_image(fname_in);
         save_image(img, fname_out);
-        printf("processed image %d.\n", ind);
+        printf("processed image %d,\n", ind);
     }
 	return 0;
 }
