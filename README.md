@@ -15,4 +15,6 @@ Note: in `simulate.sh`, you will need to change `py` to the path to your Python 
 This script generates `.png` files of the form `plane_%d.png` in the current directory as well as `simul.gif` which is the stitching of all these files into a single GIF.
 
 Here is an example from the latest simulation run.
+
+
 ![Example](simul.gif)
