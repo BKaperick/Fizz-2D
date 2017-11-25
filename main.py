@@ -48,38 +48,33 @@ class World:
         collisions = self.check_collisions()
         while collisions:
             for obj1, obj2, c_vec_normal, c_vec_mag, f1, f2 in collisions:
+                
+                # Makes things easier if the first object is never fixed
                 if obj1.is_fixed:
                     obj1,obj2 = obj2,obj1
-                    #c_vec_normal = -1 * c_vec_normal
+                
+                
                 c_vec = c_vec_normal * (c_vec_mag + 1e-7)
                 print("COLLISION", c_vec, f1, f2)
                 if f2 == 1:
                     c_vec *= -1
                     c_vec_normal *= -1
-#                
+                
                 mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
                 if np.isnan(mass_prop):
                     mass_prop = 0
                 
                 if obj2.is_fixed:
-                    #self.forces.append(obj1.mass * 
                     for i in range(len(obj1.points)):
-                        #print("updates: ", c_vec, np.dot(obj1.points[i].vel, c_vec))
                         obj1.points[i].pos += c_vec
                         
                         vdotN = np.dot(obj1.points[i].vel, c_vec_normal)
                         obj1.points[i].vel -= 2*vdotN * c_vec_normal
-                        
-                        #adotN = np.dot(obj1.points[i].acc, c_vec_normal)
-                        #obj1.points[i].acc -= 2*adotN * c_vec_normal
 
                     obj1.com.new_pos += c_vec
                     
                     vdotN = np.dot(obj1.com.vel, c_vec_normal)
                     obj1.com.vel -= 2*vdotN * c_vec_normal
-                    
-                    #adotN = np.dot(obj1.com.acc, c_vec_normal)
-                    #obj1.com.acc -= 2*adotN * c_vec_normal
                     
                     obj1.finish_update()
                     obj2.finish_update()
@@ -95,8 +90,8 @@ class World:
                     for i in range(len(obj2.points)):
                         obj2.points[i].pos -= mass_prop * (c_vec)
                     obj2.finish_update()
+
             collisions = self.check_collisions()
-            #exit()
 
         # Do second (final) pass for each object in the world
         for obj in self.objs:

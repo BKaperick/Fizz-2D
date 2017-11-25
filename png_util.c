@@ -166,7 +166,6 @@ int write_png(FILE *outfile, int width, int height, unsigned char *rgb,
 
   int i;
 
-  //print("%s\n", PNG_LIBPNG_VER_STRING);
   png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, 
 				    (png_voidp) NULL, 
 				    (png_error_ptr) NULL, 
