@@ -217,8 +217,8 @@ void save_image(image* img, char* fname) {
 
 int main(int argc, char* argv[]) {
     int num_files = atoi(argv[1]);
-    char* fname_in = malloc(11 * sizeof(char));
-    char* fname_out = malloc(11 * sizeof(char));
+    char* fname_in = malloc(14 * sizeof(char));
+    char* fname_out = malloc(14 * sizeof(char));
     image* img;    
     for (int ind = 0; ind < num_files; ind++) {
         sprintf(fname_in, "plane_%d.txt", ind);
@@ -227,6 +227,8 @@ int main(int argc, char* argv[]) {
         save_image(img, fname_out);
         printf("processed image %d,\n", ind);
     }
+    free(fname_in);
+    free(fname_out);
 	return 0;
 }
 
