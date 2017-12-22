@@ -53,7 +53,6 @@ void draw_circle(image* img, int center_x, int center_y, int radius, bool fill) 
     int dx = 1;
     int dy = 1;
     int err = dx - (radius << 1);
-    printf("center (%d, %d)\n", center_x, center_y);
     while (x >= y)
     {
         draw_pixel(img, center_x + x, center_y + y);
@@ -184,9 +183,8 @@ image* spec_to_image(char* fname) {
     fscanf(fp, "%d,%d\n", &width, &height);
     image* img = init_image_empty(width, height);
     
-    
-    
     while (!feof(fp)) {
+        printf("scanning\n");
         fgets(shape, 10, fp);
         if (strcmp(shape, "circle\n") == 0) {
             fscanf(fp, "%d,%d,%d\n", &x, &y, &rad);
@@ -202,9 +200,12 @@ image* spec_to_image(char* fname) {
             }
             draw_polygon(img, xs, ys, sides, 1);
         }
-        else
+        else {
+            printf("DANGER\n");
             return img;
+        }
     }
+    printf("returning img.(%d, %d)\n", img->width, img->height);
     return img;
 }
 
@@ -217,16 +218,21 @@ void save_image(image* img, char* fname) {
 
 int main(int argc, char* argv[]) {
     int num_files = atoi(argv[1]);
-    char* fname_in = malloc(11 * sizeof(char));
-    char* fname_out = malloc(11 * sizeof(char));
+    char* fname_in = malloc(14 * sizeof(char));
+    char* fname_out = malloc(14 * sizeof(char));
     image* img;    
     for (int ind = 0; ind < num_files; ind++) {
         sprintf(fname_in, "plane_%d.txt", ind);
         sprintf(fname_out, "plane_%d.png", ind);
+        printf("fname: %s\n", fname_in);
         img = spec_to_image(fname_in);
         save_image(img, fname_out);
         printf("processed image %d,\n", ind);
+        free(img);
     }
+    free(fname_in);
+    free(fname_out);
+    //free(img);
 	return 0;
 }
 
