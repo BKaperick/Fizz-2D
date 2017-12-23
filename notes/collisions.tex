@@ -3,13 +3,13 @@
 \input{/Users/bryan/style.tex}
 
 \title{Collision Thoughts}
-\author{Bryan Kaperick}
+%\author{Bryan Kaperick}
 
 \newcommand{\mtot}{m_A + m_B}
 
 
 \begin{document}
-\maketitle\newpage
+\maketitle
 
 We have two objects, $A$ and $B$ which collide.  We assume the two objects are uniform density, rigid bodies, and convex polygons.
 
@@ -47,22 +47,41 @@ Intuitively, we hope the outcome does not explicitly depend on the velocities of
     p_B^1 &= c_r p^0.
 \end{align*}
     
-    Here, the interpretation of $c_r$ is upheld as the linear damping of the final momenta of two identical objects with identical initial momenta.
+    Here, the interpretation of $c_r$ is upheld as the linear damping of the final momenta of two identical objects with equi-opposite initial momenta.
     
     \item $m_A = m_B =:m$
 \begin{align*}
-    p_A^1 &= \frac{1-c}{2}p_A^0 + \frac{1+c}{2}p_B^0\\
-    p_B^1 &= \frac{1+c}{2}p_A^0 + \frac{1-c}{2}p_B^0\\
+    p_A^1 &= \frac{1-c_r}{2}p_A^0 + \frac{1+c_r}{2}p_B^0\\
+    p_B^1 &= \frac{1+c_r}{2}p_A^0 + \frac{1-c_r}{2}p_B^0\\
 \end{align*}
 
-The resulting momenta are weighted averages of the initial momenta, 
+The resulting momenta are weighted averages of the initial momenta.  When $c_r = 1$, the two momenta swap so that $p_B^1 = p_A^0$ and vice versa.  When $c_r = 0$, the resulting momenta are equal since the two objects are same mass and are stuck together.
 
     \item $p_A^0 = -p_B^0 =: p^0$
 \begin{align*}
     p_A^1 &= -2c_rp^0\left(\frac{m_A}{m_A + m_B}\right)\\
     p_B^1 &= 2c_rp^0\left(\frac{m_B}{m_A + m_B}\right)\\
 \end{align*}
-Both objects entered the collision with equi-opposite momentum entering the collision, and so both objects leave the collision with equi-oppositemomentum, whose magnitude is linearly damped by the coefficient of restitution.
+Both objects entered the collision with equi-opposite momentum entering the collision, and so both objects leave the collision with equi-opposite momentum, whose magnitude is linearly damped by the coefficient of restitution, and scaled by what proportion of the total mass that object accounted for.
+
+\item $c_r = 1$ (Perfectly elastic collision)
+\begin{align*}
+    p_A^1 &= 2p_B^0\left(\frac{m_A}{\mtot}\right)\\
+    p_B^1 &= 2p_A^0\left(\frac{m_B}{\mtot}\right).
+\end{align*}
+
+Recall since this is a 1D collision, the two objects' momenta had opposite directions initially.  This result shows in a perfectly elastic collision, the objects reverse directions and the magnitude of the resulting momentum is linearly proportional to the proportion of the total mass that object held.
+
+\item $c_r = 0$ (Perfectly inelastic collision)
+\begin{align*}
+    p_A^1 &= (p_A^0 + p_B^0)\left(\frac{m_A}{\mtot}\right)\\
+    p_B^1 &= (p_A^0 + p_B^0)\left(\frac{m_B}{\mtot}\right).
+\end{align*}
+
+Here, the two objects have the same velocity since they are stuck together, so their final momenta vary only by what their difference in mass is.
+
+
+
 \end{enumerate}
 
 
