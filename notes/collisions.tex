@@ -1,0 +1,69 @@
+
+\documentclass[a4paper,11pt, oneside]{article}
+\input{/Users/bryan/style.tex}
+
+\title{Collision Thoughts}
+\author{Bryan Kaperick}
+
+\newcommand{\mtot}{m_A + m_B}
+
+
+\begin{document}
+\maketitle\newpage
+
+We have two objects, $A$ and $B$ which collide.  We assume the two objects are uniform density, rigid bodies, and convex polygons.
+
+\section{Two balls collide in 1D space}
+\begin{align*}
+    p_A^{0} &= m_Av_A^0 & \text{(Momentum of object A)}\\
+    p_B^{0} &= m_Bv_B^0 & \text{(Momentum of object B)}\\
+    c_r &= \frac{v_B^1 - v_B^0}{v_A^1 - v_A^0}  &\text{(Coefficient of restitution)}.
+\end{align*}
+The coefficient of restitution, $c_r\in[0,1]$, gives a measure of elasticity of the collision. $c_r = 0$ denotes a completely inelastic collision (no change in velocity occurs) and $c_r = 1$ denotes a completely elastic collision (kinetic energy is conserved).
+
+Given \emph{a priori} values for $m_A, m_B, v_A^0, v_B^0, c_r$, we are interested in determining $v_A^1$ and $v_B^1$.  To do this, we solve the linear system
+\begin{align*}
+    m_Av_A^0 + m_Bv_B^0 &= m_Av_A^1 + m_Bv_B^1\\
+    c_r &= \frac{v_B^1 - v_B^0}{v_A^1 - v_A^0}.
+\end{align*}
+
+This yields
+\begin{align*}
+    v_A^1 &= \frac{m_Av_A^0 + m_Bv_B^0 + c_r m_B (v_B^0 - v_A^0)}{m_A + m_B}\\
+    v_B^1 &= \frac{m_Bv_B^0 + m_Av_A^0 + c_r m_A (v_A^0 - v_B^0)}{m_B + m_A}.
+\end{align*}
+
+Intuitively, we hope the outcome does not explicitly depend on the velocities of the objects, instead in terms of momentum and mass only.  We can refomulate the results as follows.  (With $\mtot = m_A + m_B$.)
+\begin{align*}
+    p_A^1 &= \left((1-c_r)p_A^0 + (1+c_r)p_B^0\right)\left(\frac{m_A}{\mtot}\right)\\
+    p_B^1 &= \left((1+c_r)p_A^0 + (1-c_r)p_B^0\right)\left(\frac{m_B}{\mtot}\right).
+\end{align*}
+
+\subsection{Sanity Checks on some example cases:}
+\begin{enumerate}
+    \item $m_A = m_B =:m,\quad v_A^0 = -v_B^0 =: v^0$
+\begin{align*}
+    p_A^1 &= -c_r p^0\\
+    p_B^1 &= c_r p^0.
+\end{align*}
+    
+    Here, the interpretation of $c_r$ is upheld as the linear damping of the final momenta of two identical objects with identical initial momenta.
+    
+    \item $m_A = m_B =:m$
+\begin{align*}
+    p_A^1 &= \frac{1-c}{2}p_A^0 + \frac{1+c}{2}p_B^0\\
+    p_B^1 &= \frac{1+c}{2}p_A^0 + \frac{1-c}{2}p_B^0\\
+\end{align*}
+
+The resulting momenta are weighted averages of the initial momenta, 
+
+    \item $p_A^0 = -p_B^0 =: p^0$
+\begin{align*}
+    p_A^1 &= -2c_rp^0\left(\frac{m_A}{m_A + m_B}\right)\\
+    p_B^1 &= 2c_rp^0\left(\frac{m_B}{m_A + m_B}\right)\\
+\end{align*}
+Both objects entered the collision with equi-opposite momentum entering the collision, and so both objects leave the collision with equi-oppositemomentum, whose magnitude is linearly damped by the coefficient of restitution.
+\end{enumerate}
+
+
+\end{document}
