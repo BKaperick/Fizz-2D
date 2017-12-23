@@ -9,10 +9,13 @@
 import numpy as np
 from   math import acos
 
+# World constants
 GRAVITY = np.array([0.1,.2])
-EPSILON = 1e-7;
+EPSILON = 1e-7
+ELASTICITY = 0.5
 
 class World:
+    
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = []):
         self.width = width
         self.height = height
@@ -40,6 +43,10 @@ class World:
         self.fixed_objs.append(obj)
 
     def update(self):
+        '''
+        This function is called once each time step.  All position and velocity
+        updates, and all collisions are handled within.
+        '''
 
         # Apply linear damping force if exists
         if len(self.global_damping_force) == 0:
@@ -51,49 +58,69 @@ class World:
         for obj in self.objs:
             obj.pre_update([], gdf, self.time_disc)
         
+        # check_collisions() compiles a list of collisions with information:
+        #   (1,2) the two objects contained in the collision
+        #   (3) the unit vector normal to the surface of collision
+        #   (4) magnitude of normal vector
+        #   (5) a flag indicating a sign change for the normal vector
         collisions = self.check_collisions()
+        
         while collisions:
-            for obj1, obj2, c_vec_normal, c_vec_mag, flag in collisions:
+            for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
                 
                 # Makes things easier if the first object is never fixed
                 if obj1.is_fixed:
                     obj1,obj2 = obj2,obj1
                 
-                c_vec = c_vec_normal * (c_vec_mag + EPSILON)
-                #print("COLLISION", c_vec, flag)
+                # Reassemble normal vector with some added spacing so two 
+                # objects are definitely non-overlapping after collision 
+                # resolution
+                normal_vec = unit_normal_vec * (normal_vec_mag + EPSILON)
+                
+                # If flag, the normal vector needs to be flipped
                 if flag == 1:
-                    c_vec *= -1
-                    c_vec_normal *= -1
+                    normal_vec *= -1
+                    unit_normal_vec *= -1
+                
                 
                 mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
                 if np.isnan(mass_prop):
                     mass_prop = 0
                 
+                # obj1 is NEVER fixed, so this branch is for a collision with a 
+                # free object and a fixed object
+                #
+                # 1. The free object updates its position by the normal vector
+                # 2. The free object updates its velocity by twice the (negated)
+                #    component of its velocity normal to the surface
+                #
                 if obj2.is_fixed:
-                    for i in range(len(obj1.points)):
-                        obj1.points[i].pos += c_vec
-                        
-                        vdotN = np.dot(obj1.points[i].vel, c_vec_normal)
-                        obj1.points[i].vel -= 2*vdotN * c_vec_normal
-
-                    obj1.com.new_pos += c_vec
                     
-                    vdotN = np.dot(obj1.com.vel, c_vec_normal)
-                    obj1.com.vel -= 2*vdotN * c_vec_normal
+                    for i in range(len(obj1.points)):
+                        obj1.points[i].pos += normal_vec
+                        
+                        vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
+                        obj1.points[i].vel -= 2*vdotN * unit_normal_vec
+
+                    obj1.com.new_pos += normal_vec
+                    
+                    vdotN = np.dot(obj1.com.vel, unit_normal_vec)
+                    obj1.com.vel -= 2*vdotN * unit_normal_vec
                     
                     obj1.finish_update()
                     obj2.finish_update()
 
+                # Only other possible case is that both objects are free
                 else:
-                    obj1.com.new_pos += (1-mass_prop) * (c_vec)
+                    obj1.com.new_pos += (1-mass_prop) * (normal_vec)
                     for i in range(len(obj1.points)):
-                        obj1.points[i].pos += (1-mass_prop) * (c_vec)
+                        obj1.points[i].pos += (1-mass_prop) * (normal_vec)
                         
                     obj1.finish_update()
                     
-                    obj2.com.new_pos -= mass_prop * c_vec
+                    obj2.com.new_pos -= mass_prop * normal_vec
                     for i in range(len(obj2.points)):
-                        obj2.points[i].pos -= mass_prop * (c_vec)
+                        obj2.points[i].pos -= mass_prop * (normal_vec)
                     obj2.finish_update()
 
             collisions = self.check_collisions()

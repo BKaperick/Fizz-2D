@@ -11,12 +11,18 @@ from sys import argv
 
 def read_input(fname):
     with open(fname, "r") as f:
+
+        # First line of file is the dimension of the frame in pixels
         w, h = [int(x) for x in f.readline().strip().split(",")]
         world = physics.World(width=w, height = h)
+
         current_shape = ""
         for line in f.readlines():
-            if line.strip()[0] == "#":
+
+            # Ignore commented out lines and empty lines
+            if not line.strip() or line.strip()[0] == "#":
                 continue
+
             if current_shape == "circle":
                 data = line.strip().split(",")
                 if data[0] == "mass":
