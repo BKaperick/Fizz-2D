@@ -1,10 +1,11 @@
-from sys import argv
-import numpy as np
-from math import acos
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from    sys import argv
+import  numpy as np
+from    math import acos
+import  matplotlib.pyplot as plt
+from    matplotlib.animation import FuncAnimation
 
 GRAVITY = np.array([0.1,.2])
+EPSILON = 1e-7;
 
 class World:
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = []):
@@ -47,16 +48,15 @@ class World:
         
         collisions = self.check_collisions()
         while collisions:
-            for obj1, obj2, c_vec_normal, c_vec_mag, f1, f2 in collisions:
+            for obj1, obj2, c_vec_normal, c_vec_mag, flag in collisions:
                 
                 # Makes things easier if the first object is never fixed
                 if obj1.is_fixed:
                     obj1,obj2 = obj2,obj1
                 
-                
-                c_vec = c_vec_normal * (c_vec_mag + 1e-7)
-                print("COLLISION", c_vec, f1, f2)
-                if f2 == 1:
+                c_vec = c_vec_normal * (c_vec_mag + EPSILON)
+                #print("COLLISION", c_vec, flag)
+                if flag == 1:
                     c_vec *= -1
                     c_vec_normal *= -1
                 
@@ -105,9 +105,9 @@ class World:
         objects = [o for o in self.objs + self.fixed_objs if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
-                correction, correct_mag, f1, f2 = polypoly_collision(obj, other_obj)
+                correction, correct_mag, flag = polypoly_collision(obj, other_obj)
                 if len(correction) > 0:
-                    collisions.append((obj, other_obj, correction, correct_mag, f1, f2))
+                    collisions.append((obj, other_obj, correction, correct_mag, flag))
         return collisions
 
     def __str__(self):
@@ -359,12 +359,13 @@ def polypoly_collision(poly1, poly2):
         current_overlap = poly1_bounds[1] - poly2_bounds[0]
         if current_overlap < overlap:
             fix_axis = normal_axis
-            fix_flag = flag
+            #fix_flag = flag
             fix_mag_flag = mag_flag
             overlap = current_overlap
 
     #bounceback_displacement = fix_axis * overlap
-    return fix_axis, overlap, fix_flag, fix_mag_flag
+    #return fix_axis, overlap, fix_flag, fix_mag_flag
+    return fix_axis, overlap, fix_mag_flag
     #return bounceback_displacement
 
 
