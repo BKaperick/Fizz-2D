@@ -13,7 +13,7 @@
 
 We have two objects, $A$ and $B$ which collide.  We assume the two objects are uniform density, rigid bodies, and convex polygons.
 
-\section{Two balls collide in 1D space}
+\section{Two objects collide in 1D space}
 \begin{align*}
     p_A^{0} &= m_Av_A^0 & \text{(Momentum of object A)}\\
     p_B^{0} &= m_Bv_B^0 & \text{(Momentum of object B)}\\
@@ -84,5 +84,69 @@ Here, the two objects have the same velocity since they are stuck together, so t
 
 \end{enumerate}
 
+
+
+\subsection*{Computational Considerations for Simulation}
+
+We make the initial assumption that all collisions are instantaneous.  Formally, we let $\delta_t$ be the time step used in our simulation.  All events transpire at some discrete time point $t^i$ where $i=i,1,2,\dots$ and $t^i - t^{i-1} = \delta_t$ for all $i\in\N$.  Then, consider two circles $A$ and $B$.  We will adopt the notation of $trait_A$ and $trait_B$ to be analogous traits of the two circles and superscripts denote the time step at which this quantity is measured.
+
+The traits relevant to our discussion here are $x^i$, $v^i$, $a^i$, $p^i$, $R$ (radius) and $m$.  Let us consider the simplest case:
+\begin{enumerate}
+    \item 
+\begin{tabular}{c|c|c|c|c|c}
+   & $\m m$ & $\m R$ & $\m x^0$ & $\m v^0$ & $\m a^0$\\\hline
+   $A$ & $m$ & $1$ & $-1$ & $1$ & $0$\\\hline
+   $B$ & $m$ & $1$ & $1$ & $-1$ & $0$\\
+\end{tabular}
+
+Clearly at $t^1$ the two balls will be tangent to each other at the origin.  That is, the instant of (instantaneous) collision occurs at a measured time point.  Then, we adjust the momenta so that
+
+\begin{align*}
+    v_A^1 &= -c_r\\
+    v_B^1 &= c_r.
+\end{align*}
+
+So at $t^2$, we have 
+\begin{tabular}{c|c|c|c|c|c}
+   & $\m m$ & $\m R$ & $\m x^2$ & $\m v^2$ & $\m a^2$\\\hline
+   $A$ & $m$ & $1$ & $-c_r$ & $-c_r$ & $0$\\\hline
+   $B$ & $m$ & $1$ & $c_r$ & $c_r$ & $0$\\
+\end{tabular}
+
+\item 
+\begin{tabular}{c|c|c|c|c|c}
+   & $\m m$ & $\m R$ & $\m x^0$ & $\m v^0$ & $\m a^0$\\\hline
+   $A$ & $m$ & $1$ & $-1$ & $2$ & $0$\\\hline
+   $B$ & $m$ & $1$ & $1$ & $-1$ & $0$\\
+\end{tabular}
+
+Here, we have a more complicated collision, since the instant of collision occurs between $t^0$ and $t^1$.
+
+With zero acceleration, we have
+\[
+    t_{collide} = \frac{x_A^0 - x_B^0}{v_B^0 - v_A^0} = t_0 + \frac{2}{3}\delta_t.
+\]
+Regardless of which instant the collision occurs, we know
+
+\begin{align*}
+    v_A^1 &= \frac{-3c_r}{2}+\frac{1}{2}.
+    v_B^1 &= \frac{3c_r}{2}+\frac{1}{2}.
+\end{align*}
+
+But since the collision occurs before $t_1$, we need a position update at a resolution $\delta_t/3$.
+\begin{align*}
+    x_A^1 &= x_A^0 + \left(\frac{2v_A^0}{3} + \frac{v_A^1}{3}\right)\delta_t = -1 + \left(\frac{4}{3} + \frac{1-3c_r}{6}\right)\delta_t = -1 + \left(\frac{3}{2}-\frac{c_r}{2}\right)\delta_t\\
+    x_B^1 &= x_B^0 + \left(\frac{2v_B^0}{3} + \frac{v_B^1}{3}\right)\delta_t = 1 + \left(\frac{-2}{3} + \frac{1+3c_r}{6}\right)\delta_t = 1 + \left(\frac{-1}{2}+\frac{c_r}{2}\right)\delta_t.
+\end{align*}
+
+If we instead assume $\frac{2}{3}\delta_t \approx \delta_t$, we then get
+\begin{align*}
+    x_A^1 = x_A^0 + v_A^0 \delta_t = -1 + 2\delta_t\\
+    x_B^1 = x_B^0 + v_B^0 \delta_t = 1 -  \delta_t.
+\end{align*}
+
+The question remains: \emph{How large can the error in this approximation get?}
+
+\end{enumerate}
 
 \end{document}
