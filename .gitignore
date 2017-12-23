@@ -4,3 +4,4 @@
 *.log
 *.xml
 *.bcf
+*__pycache__
