@@ -5,3 +5,4 @@
 *.xml
 *.bcf
 *__pycache__
+*.swp
