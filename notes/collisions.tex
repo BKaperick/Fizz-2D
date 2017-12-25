@@ -139,6 +139,7 @@ But since the collision occurs before $t_1$, we need a position update at a reso
     x_B^1 &= x_B^0 + \left(\frac{2v_B^0}{3} + \frac{v_B^1}{3}\right)\delta_t = 1 + \left(\frac{-2}{3} + \frac{1+3c_r}{6}\right)\delta_t = 1 + \left(\frac{-1}{2}+\frac{c_r}{2}\right)\delta_t.
 \end{align*}
 
+\subsection{Error Analysis}
 If we instead assume $\frac{2}{3}\delta_t \approx \delta_t$, we then get
 \begin{align*}
     x_A^1 = x_A^0 + v_A^0 \delta_t = -1 + 2\delta_t\\
@@ -146,6 +147,43 @@ If we instead assume $\frac{2}{3}\delta_t \approx \delta_t$, we then get
 \end{align*}
 
 The question remains: \emph{How large can the error in this approximation get?}
+
+\section{Computational Cost of Collision Resolution}
+
+We use the Velocity-Verlet algorithm~\footnote{https://en.wikipedia.org/wiki/Verlet\_integration\#Velocity\_Verlet} which updates 
+\begin{align*}
+    x^1 &= x^0 + v^0\delta_t + \frac{1}{2} a^0\delta_t^2\\
+    v^1 &= v^0 + \frac{1}{2}\left( a^0 + a^1 \right)\delta_t\\
+    a^1 &= \frac{1}{m}\sum_i f_i.
+\end{align*}
+So, if a collision is detected between objects $A$ and $B$ at time step $t^1$, then we must identify the $t^*\in [t^0,t^1]$ at which
+\[
+x^0_A + v^0_Bt^* + \frac{1}{2} a_A^0\left(t^*\right)^2 = x_B^0 + v_B^0t^* + \frac{1}{2} a_B^0\left(t^*\right)^2
+\]
+which is found by computing (note the superscripts are all $0$ and left off for clarity of presentation)
+\[
+    t^*_{\pm} = \frac{v_B - v_A \pm \sqrt{(v_A - v_B)^2 - 2(a_A -  a_B)(x_A - x_B)}}{a_A - a_B}
+\]
+and choosing the root contained in the interval $[t_0,t_1]$.  
+
+We compute the computational cost of each of these steps by a more granular approach than simple FLOP count.  Since not all flops are created equal, we use the following conversions (normalized to units of \texttt{add}s)
+\begin{figure}[ht]
+   \centering
+    \begin{tabular}{|c|c|}\hline
+    + & 1 \texttt{add} \\\hline
+    - & 1 \texttt{add} \\
+    $<,>,\leq,\geq$ & 1 \texttt{add} \\
+    * & 1.5 \texttt{add} \\
+    $\div$ & 4 \texttt{add} \\
+    $\sqrt{\cdot}$ & 6 \texttt{add}\\\hline
+\end{tabular}
+\end{figure}
+
+With this standard, the velocity verlet update of position, velocity and acceleration per object is $17.5$ \texttt{add}s per dimension.  Since we are concerned with 2D physical simulation, this should cost $35$ \texttt{add}s.  
+
+Computing the two roots using the quadratic equation costs $21.5$ \texttt{add}s to find the two roots and then $2$ \texttt{add}s to determine which root is the correct one, resulting in a total of $23.5$ \texttt{add}s.  Note that we only need to compute this in one dimension as long as we are only concerned with rigged convex polygons.  
+
+Though this computation might be more complex than this, since we need to know exactly where the two objects are going to collide.  What if we look where the centers of mass are closest?
 
 \end{enumerate}
 
