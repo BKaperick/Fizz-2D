@@ -82,6 +82,8 @@ class World:
                     normal_vec *= -1
                     unit_normal_vec *= -1
                 
+                #find_time_of_collision(obj1, obj2, unit_normal_vec, normal_vec, self.dt)
+
                 
                 mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
                 if np.isnan(mass_prop):
@@ -102,7 +104,7 @@ class World:
                         vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
                         obj1.points[i].vel -= 2*vdotN * unit_normal_vec
 
-                    obj1.com.new_pos += normal_vec
+                    obj1.com.pos += normal_vec
                     
                     vdotN = np.dot(obj1.com.vel, unit_normal_vec)
                     obj1.com.vel -= 2*vdotN * unit_normal_vec
@@ -112,15 +114,15 @@ class World:
 
                 # Only other possible case is that both objects are free
                 else:
-                    obj1.com.new_pos += (1-mass_prop) * (normal_vec)
-                    for i in range(len(obj1.points)):
-                        obj1.points[i].pos += (1-mass_prop) * (normal_vec)
+                    obj1.com.pos += (1-mass_prop) * (normal_vec)
+                    for point in obj1.points:
+                        point.pos += (1-mass_prop) * (normal_vec)
                         
                     obj1.finish_update()
                     
-                    obj2.com.new_pos -= mass_prop * normal_vec
-                    for i in range(len(obj2.points)):
-                        obj2.points[i].pos -= mass_prop * (normal_vec)
+                    obj2.com.pos -= mass_prop * normal_vec
+                    for point in obj2.points:
+                        point.pos -= mass_prop * (normal_vec)
                     obj2.finish_update()
 
             collisions = self.check_collisions()
@@ -161,7 +163,6 @@ class Obj:
         
         # Attributes of motion
         self.pos = pos
-        self.new_pos = pos
         self.vel = speed
         self.acc = np.array([0.0,0.0])
         self.rot_ang = rotation_angle
@@ -185,15 +186,31 @@ class Obj:
 #                self.points[i].pos += update_x
 #                self.points[i].vel += update_v
 #                self.points[i].acc = new_acc
+        
         self.update_x, self.update_v, self.new_acc = self.com.move(force, dt)
-        for i in range(len(self.points)):
-            self.points[i].pos += self.update_x
-            self.points[i].vel += self.update_v
-            self.points[i].acc = np.array(self.new_acc, copy=True)
+        for point in self.points:
+
+            # Retain copy of previous step
+            point.oldpos = np.copy(point.pos)
+            point.oldvel = np.copy(point.vel)
+            point.oldacc = np.copy(point.acc)
+
+            point.pos += self.update_x
+            point.vel += self.update_v
+            point.acc = np.array(self.new_acc, copy=True)
+
+    def reverse_update(self):
+        self.com.pos = self.com.oldpos
+        self.com.vel = self.com.oldvel
+        self.com.acc = self.com.oldacc
+
+        for point in self.points:
+            point.pos = point.oldpos
+            point.vel = point.oldvel
+            point.acc = point.oldacc 
 
     def finish_update(self):
-        self.pos = np.array(self.com.new_pos, copy=True)
-        self.com.pos = np.array(self.com.new_pos, copy=True)
+        self.pos = np.array(self.com.pos, copy=True)
         self.vel = np.array(self.com.vel, copy=True)
         self.acc = np.array(self.com.acc, copy=True)
 #        for i in range(len(self.points)):
@@ -208,11 +225,16 @@ class Point:
         self.name = "point"
 
         self.mass = mass
-        self.pos = np.array(pos, dtype=float)
-        self.new_pos = np.array(pos, dtype=float)
-        self.vel = speed
 
+        self.oldpos = np.array(pos, dtype=float)
+        self.pos = np.array(pos, dtype=float)
+
+        self.oldvel = speed
+        self.vel = speed
+        
+        self.oldacc = np.array([0.0,0.0])
         self.acc = np.array([0.0,0.0])
+
         self.world = world
 
 
@@ -220,27 +242,29 @@ class Point:
         '''
         Velocity Verlet Algorithm to update x,v,a with global error of order 2.
         '''
-        update_v = .5 * self.acc * dt
+
+        halfdt = .5*dt
+        update_v = self.acc * halfdt
         v_avg = self.vel + update_v
         
         # Update position
         update_x = v_avg * dt
-        self.new_pos = self.pos + update_x
+        self.pos += update_x
         
         # Update acceleration
         new_acc = (sum(forces) / self.mass) + self.world.global_accel
         self.acc = new_acc
         
         # Update velocity
-        update_v += .5 * self.acc * dt
-        self.vel = v_avg + (.5 * self.acc * dt)
+        update_v += self.acc * halfdt
+        self.vel = v_avg + (self.acc * halfdt)
         
         return update_x, update_v, new_acc
 
 
     def linear_damping_move(self, forces, dt):
         update_x = (dt * self.vel) + (.5 * (dt**2) * self.acc)
-        self.new_pos = self.pos + update_x
+        self.pos += update_x
         
         tmp = dt * self.world.global_damping_force / (2 * self.mass)
         Fprev = self.acc * self.mass
@@ -279,7 +303,6 @@ class Ball(Obj):
         
         # Attributes of motion
         self.pos = np.array(pos, dtype=float)
-        self.new_pos = np.array(pos, dtype=float)
         self.vel = speed
         self.acc = np.array([0.0,0.0])
         self.rot_ang = rotation_angle
