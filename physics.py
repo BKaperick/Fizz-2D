@@ -13,6 +13,7 @@ from   math import acos
 GRAVITY = np.array([0.1,.2])
 EPSILON = 1e-7
 ELASTICITY = 0.5
+COLLISION_TOL = 1
 
 class World:
     
@@ -47,23 +48,42 @@ class World:
         This function is called once each time step.  All position and velocity
         updates, and all collisions are handled within.
         '''
+        
+        dt = self.time_disc
+        max_collision_overlap = COLLISION_TOL + 1
+        first_iter = True
+        while max_collision_overlap > COLLISION_TOL:       
+            if first_iter:
+                first_iter = False
+            else:
+                print("collision")
+                dt /= 2
+                for obj in self.objs:
+                    obj.reverse_update()
+            
+            # Apply linear damping force if exists
+            if len(self.global_damping_force) == 0:
+                gdf = []
+            else:
+                gdf = [self.global_damping_force]
+            
+            # Do first pass of position, velocity and acceleration updates for each object in the world
+            for obj in self.objs:
+                obj.pre_update([], gdf, dt)
 
-        # Apply linear damping force if exists
-        if len(self.global_damping_force) == 0:
-            gdf = []
-        else:
-            gdf = [self.global_damping_force]
-        
-        # Do first pass of position, velocity and acceleration updates for each object in the world
-        for obj in self.objs:
-            obj.pre_update([], gdf, self.time_disc)
-        
-        # check_collisions() compiles a list of collisions with information:
-        #   (1,2) the two objects contained in the collision
-        #   (3) the unit vector normal to the surface of collision
-        #   (4) magnitude of normal vector
-        #   (5) a flag indicating a sign change for the normal vector
-        collisions = self.check_collisions()
+            # check_collisions() compiles a list of collisions with information:
+            #   (1,2) the two objects contained in the collision
+            #   (3) the unit vector normal to the surface of collision
+            #   (4) magnitude of normal vector
+            #   (5) a flag indicating a sign change for the normal vector
+            collisions = self.check_collisions()
+            magnitudes = [abs(magnitude) for _,__,___,magnitude,____ in collisions]
+            #print(len(collisions), max([0] + magnitudes), dt)
+            if collisions:
+                max_collision_overlap = max(magnitudes)
+            else:
+                max_collision_overlap = 0
+            
         
         while collisions:
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
@@ -81,9 +101,6 @@ class World:
                 if flag == 1:
                     normal_vec *= -1
                     unit_normal_vec *= -1
-                
-                #find_time_of_collision(obj1, obj2, unit_normal_vec, normal_vec, self.dt)
-
                 
                 mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
                 if np.isnan(mass_prop):
@@ -132,7 +149,8 @@ class World:
             obj.finish_update()
 
         # Advance time
-        self.state += self.time_disc
+        print("dt=", self.time_disc, dt)
+        self.state += dt#self.time_disc
 
     def check_collisions(self):
         collisions = []
