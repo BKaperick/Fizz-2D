@@ -212,10 +212,8 @@ class Obj:
             point.oldpos = np.copy(point.pos)
             point.oldvel = np.copy(point.vel)
             point.oldacc = np.copy(point.acc)
-
-            point.pos += self.update_x
-            point.vel += self.update_v
-            point.acc = np.array(self.new_acc, copy=True)
+            
+            point.update_with_object(self, self.update_x, self.update_v, self.new_acc)
 
     def reverse_update(self):
         self.com.pos = self.com.oldpos
@@ -294,6 +292,16 @@ class Point:
         self.acc = F / self.mass
 
         return update_x, update_v, new_acc
+    
+    def update_with_object(self, obj, update_x, update_v, new_acc):
+        '''
+        Eventually this update will incorporate the current rotation parameters of the object
+        The update values are the updates applied to the object's center of mass.  With rotation,
+        this update will be more complex than a simple addition
+        '''
+        self.pos += update_x
+        self.vel += update_v
+        self.acc = np.array(new_acc, copy=True)
 
 
 class Polygon(Obj):
