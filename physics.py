@@ -153,6 +153,11 @@ class World:
         self.state += dt#self.time_disc
 
     def check_collisions(self):
+        '''
+        Iterates through each pair of objects in the world, and determines if any are currently overlapping.
+        Currently, only polygons and fixed polygons are supported.
+        TODO: Implement collision detection for circles.
+        '''
         collisions = []
         objects = [o for o in self.objs + self.fixed_objs if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
@@ -163,6 +168,10 @@ class World:
         return collisions
 
     def __str__(self):
+        '''
+        Output the current state of the world as a string to be read by png 
+        script.
+        '''
         outstr = str(self.width) + "," + str(self.height) + "\n"
         for obj in self.objs:
             outstr += str(obj)
@@ -197,6 +206,12 @@ class Obj:
         self.is_fixed = False
     
     def pre_update(self, force, damping_force, dt):
+        '''
+        All points in the object are updated one step in accordance with the 
+        calculations done on the center of mass point.
+        The object's official position, velocity and acceleration are not updated
+        until self.finish_update().
+        '''
         if damping_force:
             update_x, update_v, new_acc = self.com.linear_damping_move([], dt)
         
@@ -216,6 +231,12 @@ class Obj:
             point.update_with_object(self, self.update_x, self.update_v, self.new_acc)
 
     def reverse_update(self):
+        '''
+        Can be used to take one step backward in time, since each point stores one previous
+        position, velocity and acceleration.  
+        Currently, this is used in collision resolution to test out various time steps before
+        choosing one sufficiently close to the time of collision.
+        '''
         self.com.pos = self.com.oldpos
         self.com.vel = self.com.oldvel
         self.com.acc = self.com.oldacc
@@ -226,13 +247,13 @@ class Obj:
             point.acc = point.oldacc 
 
     def finish_update(self):
+        '''
+        The object's position, velocity and acceleration are updated to be 
+        consistent with its center of mass.
+        '''
         self.pos = np.array(self.com.pos, copy=True)
         self.vel = np.array(self.com.vel, copy=True)
         self.acc = np.array(self.com.acc, copy=True)
-#        for i in range(len(self.points)):
-#            self.points[i].pos += self.update_x
-#            self.points[i].vel += self.update_v
-#            self.points[i].acc = self.new_acc
         
 
 class Point:

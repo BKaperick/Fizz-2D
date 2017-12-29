@@ -9,12 +9,32 @@
 >         updates, and all collisions are handled within.
 
 ###     check_collisions(self)
+>         Iterates through each pair of objects in the world, and determines if any are currently overlapping.
+>         Currently, only polygons and fixed polygons are supported.
+>         TODO: Implement collision detection for circles.
+
 ###     __str__(self)
+>         Output the current state of the world as a string to be read by png 
+>         script.
+
 ## Obj
 ###     __init__(self, points = [], world = None, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
 ###     pre_update(self, force, damping_force, dt)
+>         All points in the object are updated one step in accordance with the 
+>         calculations done on the center of mass point.
+>         The object's official position, velocity and acceleration are not updated
+>         until self.finish_update().
+
 ###     reverse_update(self)
+>         Can be used to take one step backward in time, since each point stores one previous
+>         position, velocity and acceleration.  
+>         Currently, this is used in collision resolution to test out various time steps before
+>         choosing one sufficiently close to the time of collision.
+
 ###     finish_update(self)
+>         The object's position, velocity and acceleration are updated to be 
+>         consistent with its center of mass.
+
 ## Point
 ###     __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]))
 ###     move(self, forces, dt)
