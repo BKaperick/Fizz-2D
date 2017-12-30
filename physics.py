@@ -49,6 +49,12 @@ class World:
         updates, and all collisions are handled within.
         '''
         
+        # Apply linear damping force if exists
+        if len(self.global_damping_force) == 0:
+            gdf = []
+        else:
+            gdf = [self.global_damping_force]
+        
         dt = self.time_disc
         max_collision_overlap = COLLISION_TOL + 1
         first_iter = True
@@ -60,12 +66,6 @@ class World:
                 dt /= 2
                 for obj in self.objs:
                     obj.reverse_update()
-            
-            # Apply linear damping force if exists
-            if len(self.global_damping_force) == 0:
-                gdf = []
-            else:
-                gdf = [self.global_damping_force]
             
             # Do first pass of position, velocity and acceleration updates for each object in the world
             for obj in self.objs:
@@ -147,10 +147,16 @@ class World:
         # Do second (final) pass for each object in the world
         for obj in self.objs:
             obj.finish_update()
-
+        
+        # Update the remainder of the time step
+        for obj in self.objs:
+            obj.pre_update([], gdf, self.time_disc - dt)
+            obj.finish_update()
+        
+    
         # Advance time
         print("dt=", self.time_disc, dt)
-        self.state += dt#self.time_disc
+        self.state += self.time_disc
 
     def check_collisions(self):
         '''
