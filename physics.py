@@ -10,14 +10,15 @@ import numpy as np
 from   math import acos
 
 # World constants
-GRAVITY = np.array([0.1,.2])
+GRAVITY = np.array([1.0,5.8])
 EPSILON = 1e-7
 ELASTICITY = 0.5
 COLLISION_TOL = 1
+TIME_DISC = .5
 
 class World:
     
-    def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = []):
+    def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = TIME_DISC, gamma = []):
         self.width = width
         self.height = height
         self.objs = []
@@ -58,11 +59,10 @@ class World:
         dt = self.time_disc
         max_collision_overlap = COLLISION_TOL + 1
         first_iter = True
-        while max_collision_overlap > COLLISION_TOL:       
+        while max_collision_overlap > COLLISION_TOL and dt > EPSILON:       
             if first_iter:
                 first_iter = False
             else:
-                print("collision")
                 dt /= 2
                 for obj in self.objs:
                     obj.reverse_update()
@@ -78,13 +78,11 @@ class World:
             #   (5) a flag indicating a sign change for the normal vector
             collisions = self.check_collisions()
             magnitudes = [abs(magnitude) for _,__,___,magnitude,____ in collisions]
-            #print(len(collisions), max([0] + magnitudes), dt)
             if collisions:
                 max_collision_overlap = max(magnitudes)
             else:
                 max_collision_overlap = 0
             
-        
         while collisions:
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
                 
@@ -102,10 +100,6 @@ class World:
                     normal_vec *= -1
                     unit_normal_vec *= -1
                 
-                mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
-                if np.isnan(mass_prop):
-                    mass_prop = 0
-                
                 # obj1 is NEVER fixed, so this branch is for a collision with a 
                 # free object and a fixed object
                 #
@@ -113,24 +107,26 @@ class World:
                 # 2. The free object updates its velocity by twice the (negated)
                 #    component of its velocity normal to the surface
                 #
+                #print(obj1.is_fixed, obj2.is_fixed)
                 if obj2.is_fixed:
                     
                     for i in range(len(obj1.points)):
                         obj1.points[i].pos += normal_vec
                         
                         vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
-                        obj1.points[i].vel -= 2*vdotN * unit_normal_vec
+                        obj1.points[i].vel -= (1 + ELASTICITY)*vdotN * unit_normal_vec
 
                     obj1.com.pos += normal_vec
                     
                     vdotN = np.dot(obj1.com.vel, unit_normal_vec)
-                    obj1.com.vel -= 2*vdotN * unit_normal_vec
+                    obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
                     
                     obj1.finish_update()
                     obj2.finish_update()
 
                 # Only other possible case is that both objects are free
                 else:
+                    mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
                     obj1.com.pos += (1-mass_prop) * (normal_vec)
                     for point in obj1.points:
                         point.pos += (1-mass_prop) * (normal_vec)
@@ -155,14 +151,13 @@ class World:
         
     
         # Advance time
-        print("dt=", self.time_disc, dt)
         self.state += self.time_disc
 
     def check_collisions(self):
         '''
         Iterates through each pair of objects in the world, and determines if any are currently overlapping.
         Currently, only polygons and fixed polygons are supported.
-        TODO: Implement collision detection for circles.
+        *TODO:* Implement collision detection for circles.
         '''
         collisions = []
         objects = [o for o in self.objs + self.fixed_objs if o.name == "polygon" or o.name == "fixedpolygon"]
@@ -226,7 +221,13 @@ class Obj:
 #                self.points[i].vel += update_v
 #                self.points[i].acc = new_acc
         
+        # Retain copy of previous step
+        self.com.oldpos = np.copy(self.com.pos)
+        self.com.oldvel = np.copy(self.com.vel)
+        self.com.oldacc = np.copy(self.com.acc)
+
         self.update_x, self.update_v, self.new_acc = self.com.move(force, dt)
+
         for point in self.points:
 
             # Retain copy of previous step
@@ -238,8 +239,8 @@ class Obj:
 
     def reverse_update(self):
         '''
-        Can be used to take one step backward in time, since each point stores one previous
-        position, velocity and acceleration.  
+        Can be used to take one step backward in time and undo a pre_update, 
+        since each point stores one previous position, velocity and acceleration.  
         Currently, this is used in collision resolution to test out various time steps before
         choosing one sufficiently close to the time of collision.
         '''
@@ -330,6 +331,14 @@ class Point:
         self.vel += update_v
         self.acc = np.array(new_acc, copy=True)
 
+    def __str__(self):
+        int_pos_x = int(self.pos[0])
+        int_pos_y = int(self.pos[1])
+        bnded_pos_x = max(min(int_pos_x, self.world.width-1), 0)
+        bnded_pos_y = max(min(int_pos_y, self.world.height-1), 0)
+        return "point," + str(int(self.pos[0])) + "," + str(int(self.pos[1]))
+        #return "point," + str(bnded_pos_x) + "," + str(bnded_pos_y)
+
 
 class Polygon(Obj):
     def __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
@@ -340,7 +349,7 @@ class Polygon(Obj):
     
     def __str__(self):
         # Note we leave out mass here since that is irrelevant to graphical representation at a fixed point in time.
-        return "polygon\nsides," + str(len(self.points))+ "\n" + "\n".join(["point," + str(int(pt.pos[0])) + "," + str(int(pt.pos[1])) for pt in self.points]) + "\n"
+        return "polygon\nsides," + str(len(self.points))+ "\n" + "\n".join([str(pt) for pt in self.points]) + "\n"
 
 
 class Ball(Obj):

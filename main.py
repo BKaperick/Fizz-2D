@@ -65,10 +65,10 @@ if __name__ == '__main__':
     num_iters = int(argv[2])
     for t in range(num_iters):
         plane.update()
-        if plane.state % plane.time_disc != 0:
-            continue
+        print(t,", ",end="")
         for i,obj in enumerate(plane.objs):
             #print(obj.name,i, obj.pos, obj.vel, obj.acc)
             pass
         with open("plane_{0}.txt".format(t), "w") as f:
             f.write(str(plane))
+    print("\n")

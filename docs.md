@@ -1,7 +1,7 @@
 
 # ./physics.py
 ## World
-###     __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = 1, gamma = [])
+###     __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = TIME_DISC, gamma = [])
 ###     init_obj(self, obj)
 ###     init_fixed_obj(self, obj)
 ###     update(self)
@@ -11,7 +11,7 @@
 ###     check_collisions(self)
 >         Iterates through each pair of objects in the world, and determines if any are currently overlapping.
 >         Currently, only polygons and fixed polygons are supported.
->         TODO: Implement collision detection for circles.
+>         *TODO:* Implement collision detection for circles.
 
 ###     __str__(self)
 >         Output the current state of the world as a string to be read by png 
@@ -26,8 +26,8 @@
 >         until self.finish_update().
 
 ###     reverse_update(self)
->         Can be used to take one step backward in time, since each point stores one previous
->         position, velocity and acceleration.  
+>         Can be used to take one step backward in time and undo a pre_update, 
+>         since each point stores one previous position, velocity and acceleration.  
 >         Currently, this is used in collision resolution to test out various time steps before
 >         choosing one sufficiently close to the time of collision.
 
@@ -46,6 +46,7 @@
 >         The update values are the updates applied to the object's center of mass.  With rotation,
 >         this update will be more complex than a simple addition
 
+###     __str__(self)
 ## Polygon(Obj)
 ###     __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
 ###     __str__(self)
