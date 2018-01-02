@@ -85,7 +85,12 @@ void draw_circle(image* img, int center_x, int center_y, int radius, bool fill) 
 }
 
 void draw_line(image* img, int x0, int y0, int x1, int y1) {
-
+    
+    // Trivial one-pixel line
+    if ((x0 == x1) && (y0 == y1)) {
+        draw_pixel(img, x0, y0);
+        return;
+    }
     int dx =  abs(x1-x0), sx = x0<x1 ? 1 : -1;
     int dy = -abs(y1-y0), sy = y0<y1 ? 1 : -1; 
     int err = dx+dy, e2; /* error value e_xy */
@@ -115,11 +120,16 @@ void draw_line(image* img, int x0, int y0, int x1, int y1) {
 void draw_polygon(image* img, int* points_x, int*points_y, int num_vertices, bool fill) {
     int x0,y0,x1,y1;
     
+    // Draw the border one line at a time
     for (int ind = 1; ind <= num_vertices; ind++) {
+        
+        // Fetch current endpoints
         x0 = *(points_x+ind-1);
         y0 = *(points_y+ind-1);
         x1 = *(points_x+(ind%num_vertices));
         y1 = *(points_y+(ind%num_vertices));
+        
+        // Fill in the line pixel by pixel
         draw_line(img, x0, y0, x1, y1);
     }        
     
@@ -218,28 +228,27 @@ void save_image(image* img, char* fname) {
 int main(int argc, char* argv[]) {
     uint16_t num_files_start = atoi(argv[1]);
     uint16_t num_files_end = atoi(argv[2]);
+    uint16_t num_files = num_files_end - num_files_start;
+    printf("(%03"PRId16", %03"PRId16")\n", num_files_start, num_files_end);
     //int num_files = (126 < num_files_actual) ? num_files_actual : 126;
     char* fname_in;
     char* fname_out;
     image* img;
     
-    //while (num_files > 0) {
-        fname_in = malloc(14 * sizeof(char));
-        fname_out = malloc(14 * sizeof(char));
-        
-        for (uint16_t ind = num_files_start; ind < num_files_end; ind++) {
-            printf("%"PRId16" ind\n",ind);
-            sprintf(fname_in, "plane_%"PRId16".txt", ind);
-            sprintf(fname_out, "plane_%"PRId16".png", ind);
-            img = spec_to_image(fname_in);
-            save_image(img, fname_out);
-            printf("processed image %d,\n", ind);
-        }
-        free(fname_in);
-        free(fname_out);
+    fname_in = malloc(14 * sizeof(char));
+    fname_out = malloc(14 * sizeof(char));
+    
+    for (uint16_t ind = num_files_start; ind < num_files_end; ind++) {
+        printf("%"PRId16" ind\n",ind);
+        sprintf(fname_in, "plane_%03"PRId16".txt", ind);
+        sprintf(fname_out, "plane_%03"PRId16".png", ind);
+        img = spec_to_image(fname_in);
+        save_image(img, fname_out);
+        printf("processed image %03"PRId16",\n", ind);
+    }
+    free(fname_in);
+    free(fname_out);
 
-    //    num_files -= 126;
-    //}
 	return 0;
 }
 

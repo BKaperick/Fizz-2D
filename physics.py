@@ -368,7 +368,13 @@ class Polygon(Obj):
 
     
     def __str__(self):
-        # Note we leave out mass here since that is irrelevant to graphical representation at a fixed point in time.
+        '''
+        This prints the polygon object as a string compatible with draw.c.
+
+        Note: we leave out mass here since that is irrelevant to graphical 
+        representation at a fixed point in time.
+        '''
+        
         return "polygon\nsides," + str(len(self.points))+ "\n" + "\n".join([str(pt) for pt in self.points]) + "\n"
 
 

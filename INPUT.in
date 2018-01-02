@@ -10,8 +10,8 @@ point,10,91
 fixedpolygon
 sides,4
 point,800,399
-point,800,100
-point,999,100
+point,800,000
+point,999,000
 point,999,399
 # Upward-sloping triangle
 fixedpolygon

@@ -76,6 +76,6 @@ if __name__ == '__main__':
         for i,obj in enumerate(plane.objs):
             #print(obj.name,i, obj.pos, obj.vel, obj.acc)
             pass
-        with open("plane_{0}.txt".format(t), "w") as f:
+        with open("plane_%03d.txt" % t, "w") as f:
             f.write(str(plane))
     print("\n")
