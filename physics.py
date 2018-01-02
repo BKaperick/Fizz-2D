@@ -361,6 +361,7 @@ class Polygon(Obj):
 #            area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
 #        else:
 #
+#
 #        
 #        return area
             
