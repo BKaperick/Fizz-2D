@@ -216,19 +216,30 @@ void save_image(image* img, char* fname) {
 }
 
 int main(int argc, char* argv[]) {
-    int num_files = atoi(argv[1]);
-    char* fname_in = malloc(23 * sizeof(char));
-    char* fname_out = malloc(23 * sizeof(char));
-    image* img;    
-    for (int ind = 0; ind < num_files; ind++) {
-        sprintf(fname_in, "plane_%d.txt", ind);
-        sprintf(fname_out, "plane_%d.png", ind);
-        img = spec_to_image(fname_in);
-        save_image(img, fname_out);
-        printf("processed image %d,\n", ind);
-    }
-    free(fname_in);
-    free(fname_out);
+    uint16_t num_files_start = atoi(argv[1]);
+    uint16_t num_files_end = atoi(argv[2]);
+    //int num_files = (126 < num_files_actual) ? num_files_actual : 126;
+    char* fname_in;
+    char* fname_out;
+    image* img;
+    
+    //while (num_files > 0) {
+        fname_in = malloc(14 * sizeof(char));
+        fname_out = malloc(14 * sizeof(char));
+        
+        for (uint16_t ind = num_files_start; ind < num_files_end; ind++) {
+            printf("%"PRId16" ind\n",ind);
+            sprintf(fname_in, "plane_%"PRId16".txt", ind);
+            sprintf(fname_out, "plane_%"PRId16".png", ind);
+            img = spec_to_image(fname_in);
+            save_image(img, fname_out);
+            printf("processed image %d,\n", ind);
+        }
+        free(fname_in);
+        free(fname_out);
+
+    //    num_files -= 126;
+    //}
 	return 0;
 }
 

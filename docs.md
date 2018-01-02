@@ -49,13 +49,3 @@
 ###     __str__(self)
 ## Polygon(Obj)
 ###     __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
-###     __str__(self)
-## Ball(Obj)
-###     __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
-###     __str__(self)
-## FixedPolygon(Polygon)
-###     __init__(self, world = None, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
-## polypoly_collision(poly1, poly2)
-
-# ./main.py
-## read_input(fname)

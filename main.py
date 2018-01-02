@@ -18,13 +18,20 @@ def read_input(fname):
 
         current_shape = ""
         for line in f.readlines():
+            line = line.strip()
 
             # Ignore commented out lines and empty lines
-            if not line.strip() or line.strip()[0] == "#":
+            if not line or line[0] == "#":
                 continue
+            
+            words = line.split()
+            if words[0] == "PARAM":
+               setattr(physics, words[1], float(words[2]))
+               continue
+                
 
             if current_shape == "circle":
-                data = line.strip().split(",")
+                data = line.split(",")
                 if data[0] == "mass":
                     mass = float(data[1])
                 else:
@@ -35,7 +42,7 @@ def read_input(fname):
                     current_shape = ""
             
             elif current_shape == "polygon" or current_shape == "fixedpolygon":
-                data = line.strip().split(",")
+                data = line.split(",")
                 if data[0] == "mass":
                     mass = float(data[1])
                 elif data[0] == "sides":
@@ -54,7 +61,7 @@ def read_input(fname):
                             obj = physics.FixedPolygon(world, points = points)
                         current_shape = ""
             else:
-                current_shape = line.strip()
+                current_shape = line
                 mass = physics.np.inf
     return world
 

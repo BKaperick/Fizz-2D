@@ -10,11 +10,12 @@ import numpy as np
 from   math import acos
 
 # World constants
-GRAVITY = np.array([1.0,5.8])
+GRAVITY = np.array([5.0,5.8])
 EPSILON = 1e-7
 ELASTICITY = 0.5
 COLLISION_TOL = 1
-TIME_DISC = .5
+TIME_DISC = .4
+VIBRATE_TOL = 1e-5
 
 class World:
     
@@ -111,14 +112,18 @@ class World:
                 if obj2.is_fixed:
                     
                     for i in range(len(obj1.points)):
+                        #if np.linalg.norm(normal_vec) > VIBRATE_TOL:
                         obj1.points[i].pos += normal_vec
                         
                         vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
+                        #if np.linalg.norm(vdotN) > VIBRATE_TOL:
                         obj1.points[i].vel -= (1 + ELASTICITY)*vdotN * unit_normal_vec
 
-                    obj1.com.pos += normal_vec
+                    if np.linalg.norm(normal_vec) > VIBRATE_TOL:
+                        obj1.com.pos += normal_vec
                     
                     vdotN = np.dot(obj1.com.vel, unit_normal_vec)
+                    #if np.linalg.norm(vdotN) > VIBRATE_TOL:
                     obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
                     
                     obj1.finish_update()
@@ -336,8 +341,8 @@ class Point:
         int_pos_y = int(self.pos[1])
         bnded_pos_x = max(min(int_pos_x, self.world.width-1), 0)
         bnded_pos_y = max(min(int_pos_y, self.world.height-1), 0)
-        return "point," + str(int(self.pos[0])) + "," + str(int(self.pos[1]))
-        #return "point," + str(bnded_pos_x) + "," + str(bnded_pos_y)
+        #return "point," + str(int(self.pos[0])) + "," + str(int(self.pos[1]))
+        return "point," + str(bnded_pos_x) + "," + str(bnded_pos_y)
 
 
 class Polygon(Obj):
@@ -345,7 +350,22 @@ class Polygon(Obj):
         
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
-        
+    
+#    def area(self):
+#        '''
+#        Computes the area of each triangle of points (Two vertices and the COM), 
+#        and then sums those up.
+#        '''
+#        if len(self.points) == 3:
+#            pA,pB,pC = [p.pos for p in self.points]
+#            area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
+#        else:
+#
+#        
+#        return area
+            
+
+
     
     def __str__(self):
         # Note we leave out mass here since that is irrelevant to graphical representation at a fixed point in time.
@@ -396,7 +416,6 @@ def polypoly_collision(poly1, poly2):
     poly2_edges = list(zip(poly2.points[:-1], poly2.points[1:])) + [(poly2.points[-1], poly2.points[0])]
     poly2_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly2_edges]
     
-
     overlap = np.inf
     for axis,flag in list(zip(poly1_normals,[1]*len(poly1_normals))) + list(zip(poly2_normals, [2]*len(poly2_normals))):
         
@@ -442,4 +461,3 @@ def polypoly_collision(poly1, poly2):
     #return fix_axis, overlap, fix_flag, fix_mag_flag
     return fix_axis, overlap, fix_mag_flag
     #return bounceback_displacement
-
