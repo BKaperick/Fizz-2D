@@ -17,4 +17,5 @@ This script generates `.png` files of the form `plane_%d.png` in the current dir
 Here is an example from the latest simulation run.
 
 
-![Example](simul.gif)
+![Example 1](simul.gif)
+![Example 2](simul2.gif)
