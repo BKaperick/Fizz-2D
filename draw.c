@@ -229,23 +229,20 @@ int main(int argc, char* argv[]) {
     uint16_t num_files_start = atoi(argv[1]);
     uint16_t num_files_end = atoi(argv[2]);
     uint16_t num_files = num_files_end - num_files_start;
-    printf("(%03"PRId16", %03"PRId16")\n", num_files_start, num_files_end);
-    //int num_files = (126 < num_files_actual) ? num_files_actual : 126;
+    
     char* fname_in;
     char* fname_out;
     image* img;
     
     fname_in = malloc(14 * sizeof(char));
     fname_out = malloc(14 * sizeof(char));
-    
     for (uint16_t ind = num_files_start; ind < num_files_end; ind++) {
-        printf("%"PRId16" ind\n",ind);
         sprintf(fname_in, "plane_%03"PRId16".txt", ind);
         sprintf(fname_out, "plane_%03"PRId16".png", ind);
         img = spec_to_image(fname_in);
         save_image(img, fname_out);
-        printf("processed image %03"PRId16",\n", ind);
     }
+    printf("processed images %03"PRId16" through %03"PRId16"\n", num_files_start, num_files_end);
     free(fname_in);
     free(fname_out);
 

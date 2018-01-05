@@ -1,7 +1,7 @@
 
 # ./physics.py
 ## World
-###     __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = TIME_DISC, gamma = [])
+###     __init__(self, width, height, objs = set(), global_accel = GRAVITY,
 ###     init_obj(self, obj)
 ###     init_fixed_obj(self, obj)
 ###     update(self)
@@ -9,7 +9,8 @@
 >         updates, and all collisions are handled within.
 
 ###     check_collisions(self)
->         Iterates through each pair of objects in the world, and determines if any are currently overlapping.
+>         Iterates through each pair of objects in the world, and determines if 
+>         any are currently overlapping.
 >         Currently, only polygons and fixed polygons are supported.
 >         *TODO:* Implement collision detection for circles.
 
@@ -18,7 +19,7 @@
 >         script.
 
 ## Obj
-###     __init__(self, points = [], world = None, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
+###     __init__(self, points = [], world = None, mass = 1,
 ###     pre_update(self, force, damping_force, dt)
 >         All points in the object are updated one step in accordance with the 
 >         calculations done on the center of mass point.
@@ -36,7 +37,7 @@
 >         consistent with its center of mass.
 
 ## Point
-###     __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]))
+###     __init__(self,
 ###     move(self, forces, dt)
 >         Velocity Verlet Algorithm to update x,v,a with global error of order 2.
 

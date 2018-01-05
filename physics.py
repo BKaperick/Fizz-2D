@@ -10,16 +10,17 @@ import numpy as np
 from   math import acos
 
 # World constants
-GRAVITY = np.array([5.0,5.8])
+GRAVITY = np.array([0.0,9.8])
 EPSILON = 1e-7
 ELASTICITY = 0.5
 COLLISION_TOL = 1
-TIME_DISC = .4
+TIME_DISC = .1
 VIBRATE_TOL = 1e-5
 
 class World:
     
-    def __init__(self, width, height, objs = set(), global_accel = GRAVITY, time_disc = TIME_DISC, gamma = []):
+    def __init__(self, width, height, objs = set(), global_accel = GRAVITY, 
+                 time_disc = TIME_DISC, gamma = []):
         self.width = width
         self.height = height
         self.objs = []
@@ -64,11 +65,13 @@ class World:
             if first_iter:
                 first_iter = False
             else:
+                #print("collision (dt=%02f)" % dt)
                 dt /= 2
                 for obj in self.objs:
                     obj.reverse_update()
             
-            # Do first pass of position, velocity and acceleration updates for each object in the world
+            # Do first pass of position, velocity and acceleration updates for 
+            # each object in the world
             for obj in self.objs:
                 obj.pre_update([], gdf, dt)
 
@@ -83,6 +86,7 @@ class World:
                 max_collision_overlap = max(magnitudes)
             else:
                 max_collision_overlap = 0
+            #print(max_collision_overlap)
             
         while collisions:
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
@@ -117,7 +121,7 @@ class World:
                         
                         vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
                         #if np.linalg.norm(vdotN) > VIBRATE_TOL:
-                        obj1.points[i].vel -= (1 + ELASTICITY)*vdotN * unit_normal_vec
+                        obj1.points[i].vel -= (1+ELASTICITY)*vdotN*unit_normal_vec
 
                     if np.linalg.norm(normal_vec) > VIBRATE_TOL:
                         obj1.com.pos += normal_vec
@@ -160,12 +164,14 @@ class World:
 
     def check_collisions(self):
         '''
-        Iterates through each pair of objects in the world, and determines if any are currently overlapping.
+        Iterates through each pair of objects in the world, and determines if 
+        any are currently overlapping.
         Currently, only polygons and fixed polygons are supported.
         *TODO:* Implement collision detection for circles.
         '''
         collisions = []
-        objects = [o for o in self.objs + self.fixed_objs if o.name == "polygon" or o.name == "fixedpolygon"]
+        objects = [o for o in self.objs + self.fixed_objs 
+                if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
                 correction, correct_mag, flag = polypoly_collision(obj, other_obj)
@@ -187,10 +193,15 @@ class World:
 
 
 class Obj:
-    def __init__(self, points = [], world = None, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+    def __init__(self, points = [], world = None, mass = 1, 
+                pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
+                rotation_angle = 0.0, rotation_speed = 0.0):
         
         self.points = points
-        self.com = Point(world, pos = sum([pt.pos for pt in points]) / len(points), mass = mass)
+        self.com = Point(
+                world, 
+                pos = sum([pt.pos for pt in points]) / len(points), 
+                mass = mass)
         
         self.mass = mass
         
@@ -269,7 +280,12 @@ class Obj:
         
 
 class Point:
-    def __init__(self, world, mass = 1, pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0])):
+    def __init__(self, 
+                world, 
+                mass = 1, 
+                pos = np.array([0.0,0.0]),
+                speed = np.array([150.0,0.0])
+                ):
         
         self.name = "point"
 

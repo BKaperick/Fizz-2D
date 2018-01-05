@@ -1,4 +1,6 @@
 #!/bin/bash
+rm *png
+rm *txt
 py main.py $1 $2
 start=0
 end=126

@@ -1,11 +1,11 @@
-1000,400
-# Rectangle on rightmost edge of screen
+1010,710
+# Rectangle on leftmost edge of screen
 fixedpolygon
 sides,4
-point,0,91
-point,0,298
-point,10,298
 point,10,91
+point,10,298
+point,20,298
+point,20,91
 # Rectangle on rightmost edge of screen
 fixedpolygon
 sides,4
@@ -22,8 +22,8 @@ point,799,599
 # Downward-sloping triangle
 fixedpolygon
 sides,3
-point,600,399
-point,391,499
+point,600,599
+point,391,599
 point,391,359
 # Rectangle on leftmost edge of screen
 fixedpolygon
