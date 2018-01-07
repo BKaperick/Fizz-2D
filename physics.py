@@ -539,3 +539,67 @@ def triangle_moment_of_inertia(p0,p1,p2):
     h = np.linalg.norm(p1 - pmin)
 
     I = ((b^3)*h - (b^2)*h*a + b*h*(a^2) + b*(h^3)) / 36
+
+def find_closest_sides(poly1, poly2):
+    p1_close_point1
+    p1_close_point2
+    p1_error1 = np.inf
+    p1_error2 = np.inf
+
+    for p1_ind,point in enumerate(poly1.points):
+        
+        error1 = np.inf
+        error2 = np.inf
+        [abs(point.pos - p.pos) for p in poly2.points]
+        error, ind = min((val, idx) for (idx, val) in enumerate([np.linalg.norm(point.pos - p.pos) for p in poly2.points]))
+        if error < error2:
+            if error < error1:
+                
+                ind2 = ind1
+                ind1 = ind
+                
+                error2 = error1
+                error1 = error
+                
+                p1_ind2 = p1_ind1
+                p1_ind1 = p1_ind
+
+            else:
+                ind2 = ind
+                error2 = error
+                p1_ind2 = p1_ind
+    
+    p1_point1 = poly1.points[p1_ind1] 
+    p1_point2 = poly1.points[p1_ind2]
+    
+    point1 = poly2.points[ind1] 
+    point2 = poly2.points[ind2]
+
+    return p1_point1, p1_point2, point1, point2
+
+
+def side_contact(poly1, poly2):
+    '''
+    Returns a boolean determining whether two objects are in "face-to-face" contact.
+    '''
+    points = find_closest_sides(poly1, poly2)
+    p11,p12,p21,p22 = [p.pos for p in points]
+    
+    # Translate the two vectors so they're rooted at (0,0)
+    p1 = np.array(p12[0] - p11[0], p12[1] - p11[1])
+    p2 = np.array(p22[0] - p21[0], p22[1] - p21[1])
+    
+    costheta = (p12[0] - p11[0]) * (p22[0] - p21[0]) + (p12[1] - p11[1]) * (p22[1] - p21[1])
+    costheta /= (np.linalg.norm(p12 - p11) * np.linalg.norm(p22 - p21))
+    
+    if 1 - abs(costheta) >= ANGLE_TOL:
+        return False
+    det = (p21[0]*p22[1] - p12[1]*p22[0])
+    change_coords = lambda p: np.array([p[0] - p21[0], p[0] * (p21[1]*p22[1]/det) + p[1] * (-p21[1]*p22[0]/det) - p21[1]])
+    p11 = change_coords(p11)
+    p12 = change_coords(p12)
+    p21 = np.array([0.0,0.0])
+    p22 = np.array([p22[0] - p21[0], 0.0])
+    
+    minx = min(0, p11[0]
+    
