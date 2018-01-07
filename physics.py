@@ -521,8 +521,14 @@ def triangle_area(p0,p1,p2):
     return area
 
 def triangle_moment_of_inertia(p0,p1,p2):
-    b = np.linalg.norm(p2 - p0)
+
+    # If the line from p0,p2 is close to vertical, the slope calculation is 
+    # unstable - We resolve this by simply cycling the point values
+    if abs(p2[0] - p0[0]) < EPSILON:
+        p1,p2,p0 = p0,p1,p2
+
     slope = (p2[1] - p0[1]) / (p2[0] - p0[0])
+    b = np.linalg.norm(p2 - p0)
 
     # Create new point where argmin of distance from p1 to the line 
     # between p0 and p2 occurs
