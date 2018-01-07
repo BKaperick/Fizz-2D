@@ -48,5 +48,13 @@ point,90,90
 point,110,90
 point,110,70
 point,90,70
+# Large square
+polygon
+sides,4
+mass,5
+point,90,55
+point,110,55
+point,110,35
+point,90,35
 
 PARAM ELASTICITY .8

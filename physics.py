@@ -366,24 +366,54 @@ class Polygon(Obj):
         
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
+        self.num_edges = len(points)
     
-#    def area(self):
-#        '''
-#        Computes the area of each triangle of points (Two vertices and the COM), 
-#        and then sums those up.
-#        '''
-#        if len(self.points) == 3:
-#            pA,pB,pC = [p.pos for p in self.points]
-#            area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
-#        else:
-#
-#
-#        
-#        return area
+    def moment_of_inertia(self, cached_I = None):
+        '''
+        Computes the moment of inertia by splitting polygon into triangles 
+        cornered at self.com.
+        '''
+        if cached_I:
+            return cached_I
+        if len(self.points) == 3:
+            p0,p1,p2 = [p.pos for p in self.points]
+            #area = triangle_area(p0,p1,p2)
+            #com = (p0 + p1 + p2) / 3
+            I = triangle_moment_of_inertia(p0,p1,p2)
+            cached_I = I
+        else:
+            I = 0.0
+            weighted_masses = 0.0
+            self.area = 0.0
+            p0 = self.com.pos
+            for point1,point2 in zip(self.points[:-1], self.points[1:]):
+                
+                p1 = point1.pos
+                p2 = point2.pos
+                I_tri = triangle_moment_of_inertia(p0,p1,p2)
+
+                # Weight the mass of each triangle by its distance from the COM of the polygon
+                com = (p0 + p1 + p2) / 3
+                dsquared = np.linalg.norm(com - p0)
+
+                
+                # Compute area of polygon "for free"
+                area = triangle_area(p0,p1,p2)
+                self.area += area
+
+                # Once weighted_masses is scaled by M/A we add it into I.
+                # However, we don't know A until the end of the loop
+                I += I_tri
+                weighted_masses += area * dsquared
             
+            # Now that self.area is fully computed, we add components together
+            weighted_masses *= (self.mass / self.area) 
+            I += weighted_masses
 
-
-    
+            # Save value for next time
+            cached_I = I
+        return I
+                
     def __str__(self):
         '''
         This prints the polygon object as a string compatible with draw.c.
@@ -484,3 +514,22 @@ def polypoly_collision(poly1, poly2):
     #return fix_axis, overlap, fix_flag, fix_mag_flag
     return fix_axis, overlap, fix_mag_flag
     #return bounceback_displacement
+    
+
+def triangle_area(p0,p1,p2):
+    area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
+    return area
+
+def triangle_moment_of_inertia(p0,p1,p2):
+    b = np.linalg.norm(p2 - p0)
+    slope = (p2[1] - p0[1]) / (p2[0] - p0[0])
+
+    # Create new point where argmin of distance from p1 to the line 
+    # between p0 and p2 occurs
+    xmin = (slope^2 * p0[0] + slope * p1[1] - slope * p0[1] + p1[0]) / (slope^2 + 1)
+    pmin = np.array([xmin, slope*(xmin - p0[0]) + p0[1]])
+    
+    a = np.linalg.norm(p0 - pmin)
+    h = np.linalg.norm(p1 - pmin)
+
+    I = ((b^3)*h - (b^2)*h*a + b*h*(a^2) + b*(h^3)) / 36

@@ -1,7 +1,7 @@
 #!/bin/bash
 py ../../extract_skeleton.py -d docs.md
-./simulate.sh INPUT.in $1
+./simulate.sh $1 $2
 git add .
-git commit -m "$2"
+git commit -m "$3"
 git push
 

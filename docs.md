@@ -1,4 +1,7 @@
 
+# ./main_old.py
+## read_input(fname)
+
 # ./physics.py
 ## World
 ###     __init__(self, width, height, objs = set(), global_accel = GRAVITY,
@@ -50,6 +53,10 @@
 ###     __str__(self)
 ## Polygon(Obj)
 ###     __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
+###     moment_of_inertia(self, cached_I = None)
+>         Computes the moment of inertia by splitting polygon into triangles 
+>         cornered at self.com.
+
 ###     __str__(self)
 >         This prints the polygon object as a string compatible with draw.c.
 >         Note: we leave out mass here since that is irrelevant to graphical 
@@ -61,6 +68,8 @@
 ## FixedPolygon(Polygon)
 ###     __init__(self, world = None, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
 ## polypoly_collision(poly1, poly2)
+## triangle_area(p0,p1,p2)
+## triangle_moment_of_inertia(p0,p1,p2)
 
 # ./main.py
 ## read_input(fname)
