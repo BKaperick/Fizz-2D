@@ -17,6 +17,9 @@ COLLISION_TOL = 1
 TIME_DISC = .1
 VIBRATE_TOL = 1e-5
 
+ANGLE_TOL = 1e-2
+CONTACT_TOL = 1e-2
+
 class World:
     
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, 
@@ -595,11 +598,23 @@ def side_contact(poly1, poly2):
     if 1 - abs(costheta) >= ANGLE_TOL:
         return False
     det = (p21[0]*p22[1] - p12[1]*p22[0])
+
+    # Applies rotation and shift
     change_coords = lambda p: np.array([p[0] - p21[0], p[0] * (p21[1]*p22[1]/det) + p[1] * (-p21[1]*p22[0]/det) - p21[1]])
     p11 = change_coords(p11)
     p12 = change_coords(p12)
     p21 = np.array([0.0,0.0])
     p22 = np.array([p22[0] - p21[0], 0.0])
     
-    minx = min(0, p11[0]
+
+    rightmost_leftend = max(0, p11[0])
+    leftmost_rightend = min(p12[0],p22[0])
+
+    length_of_contact = min(p12[0],p22[0]) - max(0,p11[0])
+    assert(length_of_contact >= 0)
+
+    if length_of_contact < CONTACT_TOL:
+        length_of_contact = 0
+    return length_of_contact
+    
     
