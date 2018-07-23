@@ -1,7 +1,7 @@
 #!/bin/bash
 rm ./simulations/*png
 rm ./simulations/*txt
-py ./src/main.py $1 $2 $3
+python ./src/main.py $1 $2 $3
 declare pids
 # for pid in $(pgrep 'draw'); do
 #     wait "$pid"
