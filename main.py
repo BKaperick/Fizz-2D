@@ -85,7 +85,7 @@ if __name__ == '__main__':
         #for i,obj in enumerate(plane.objs):
         #    print(obj.name,i, obj.pos, obj.vel, obj.acc)
         #    pass
-        with open("plane_%03d.txt" % t, "w") as f:
+        with open("./simulations/plane_%03d.txt" % t, "w") as f:
             f.write(str(plane))
         if t and t % 126 == 0:
             start = time.time()

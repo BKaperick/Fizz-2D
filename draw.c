@@ -234,11 +234,11 @@ int main(int argc, char* argv[]) {
     char* fname_out;
     image* img;
     
-    fname_in = malloc(14 * sizeof(char));
-    fname_out = malloc(14 * sizeof(char));
+    fname_in = malloc(30 * sizeof(char));
+    fname_out = malloc(30 * sizeof(char));
     for (uint16_t ind = num_files_start; ind < num_files_end; ind++) {
-        sprintf(fname_in, "plane_%03"PRId16".txt", ind);
-        sprintf(fname_out, "plane_%03"PRId16".png", ind);
+        sprintf(fname_in, "./simulations/plane_%03"PRId16".txt", ind);
+        sprintf(fname_out, "./simulations/plane_%03"PRId16".png", ind);
         img = spec_to_image(fname_in);
         save_image(img, fname_out);
     }

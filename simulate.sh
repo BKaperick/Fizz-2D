@@ -1,6 +1,6 @@
 #!/bin/bash
-rm *png
-rm *txt
+rm ./simulations/*png
+rm ./simulations/*txt
 py main.py $1 $2 $3
 declare pids
 # for pid in $(pgrep 'draw'); do
@@ -18,5 +18,6 @@ declare pids
 # done
 # echo $end
 # ./draw $start $2
-yes | ffmpeg -i plane_%03d.png simul.gif
+echo "Found"
+yes | ffmpeg -i simulations/plane_%03d.png simulations/simul.gif
 
