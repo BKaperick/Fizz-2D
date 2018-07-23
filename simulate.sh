@@ -1,7 +1,7 @@
 #!/bin/bash
 rm *png
 rm *txt
-py main.py $1 $2
+py main.py $1 $2 $3
 declare pids
 # for pid in $(pgrep 'draw'); do
 #     wait "$pid"

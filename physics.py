@@ -23,13 +23,14 @@ CONTACT_TOL = 1e-2
 class World:
     
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, 
-                 time_disc = TIME_DISC, gamma = []):
+                 time_disc = TIME_DISC, gamma = [], verbosity = 0):
         self.width = width
         self.height = height
         self.objs = []
         self.fixed_objs = []
         self.time_disc = time_disc
         self.state = 0
+        self.verbosity = verbosity
         
         self.global_accel = global_accel
         self.global_damping_force = np.array([])
@@ -177,7 +178,7 @@ class World:
                 if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
-                correction, correct_mag, flag = polypoly_collision(obj, other_obj)
+                correction, correct_mag, flag = polypoly_collision(obj, other_obj, verbosity = self.verbosity)
                 if len(correction) > 0:
                     collisions.append((obj, other_obj, correction, correct_mag, flag))
         return collisions
@@ -465,7 +466,9 @@ class FixedPolygon(Polygon):
         self.is_fixed = True
         
 
-def polypoly_collision(poly1, poly2):
+def polypoly_collision(poly1, poly2, verbosity=0):
+    if verbosity:
+        print(poly1, poly2)
     poly1_edges = list(zip(poly1.points[:-1], poly1.points[1:])) + [(poly1.points[-1], poly1.points[0])]
     poly1_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly1_edges]
     

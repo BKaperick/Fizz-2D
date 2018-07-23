@@ -8,6 +8,7 @@
 
 # ARGV[1] - INPUT FILE
 # ARGV[2] - NUMBER OF TIME STEPS
+# ARGV[3] - VERBOSITY (OPTIONAL)
 
 import physics
 from sys import argv
@@ -15,12 +16,12 @@ import subprocess
 import os
 import time
 
-def read_input(fname):
+def read_input(fname, verbosity = 0):
     with open(fname, "r") as f:
 
         # First line of file is the dimension of the frame in pixels
         w, h = [int(x) for x in f.readline().strip().split(",")]
-        world = physics.World(width=w, height = h)
+        world = physics.World(width=w, height = h, verbosity = verbosity)
 
         current_shape = ""
         for line in f.readlines():
@@ -74,8 +75,9 @@ def read_input(fname):
 
 if __name__ == '__main__':
         
-    plane = read_input(argv[1])
     num_iters = int(argv[2])
+    verbosity = int(argv[3]) if len(argv) >= 4 else 0
+    plane = read_input(argv[1], verbosity)
     processes = []
     for t in range(num_iters):
         plane.update()
