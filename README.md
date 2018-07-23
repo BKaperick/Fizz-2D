@@ -20,4 +20,4 @@ Here is an example from the latest simulation run.
 
 
 ![Example 1](./simulations/simul.gif)
-![Example 2](simul2.gif)
+![Example 2](./simulations/simul2.gif)

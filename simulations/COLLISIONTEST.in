@@ -1,0 +1,45 @@
+1000,300
+# Rectangle on leftmost edge of screen
+fixedpolygon
+sides,4
+point,0,0
+point,0,300
+point,50,300
+point,50,0
+# Rectangle on rightmost edge of screen
+fixedpolygon
+sides,4
+point,950,0
+point,950,300
+point,1000,300
+point,1000,0
+# Rectangle on bottom edge of screen
+fixedpolygon
+sides,4
+point,51,0
+point,51,50
+point,949,50
+point,949,0
+# Rectangle on top edge of screen
+fixedpolygon
+sides,4
+point,51,251
+point,51,300
+point,949,300
+point,949,251
+# Left Object
+polygon
+sides,4
+point,100,100
+point,100,150
+point,150,150
+point,150,100
+# Right Object
+polygon
+sides,4
+point,900,100
+point,900,150
+point,850,150
+point,850,100
+
+PARAM ELASTICITY .8
