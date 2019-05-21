@@ -483,6 +483,7 @@ class Polygon(Obj):
             #com = (p0 + p1 + p2) / 3
             I = triangle_moment_of_inertia(p0,p1,p2)
             self.cached_I = I
+            self.area = triangle_area(p0,p1,p2)
         else:
             I = 0.0
             weighted_masses = 0.0

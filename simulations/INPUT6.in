@@ -6,6 +6,13 @@ point,10,91
 point,10,298
 point,20,298
 point,20,91
+#Ceiling
+#fixedpolygon
+#sides,4
+#point,400,99
+#point,400,000
+#point,799,000
+#point,799,99
 # Rectangle on rightmost edge of screen
 fixedpolygon
 sides,4
@@ -19,6 +26,22 @@ sides,3
 point,601,599
 point,799,359
 point,799,599
+# moving triangle
+polygon
+sides,3
+density,10
+velocity,0,50
+point,651,499
+point,699,459
+point,699,499
+# moving triangle
+polygon
+sides,3
+density,10
+velocity,0,50
+point,651,380
+point,699,420
+point,699,380
 # Downward-sloping triangle
 fixedpolygon
 sides,3
@@ -37,37 +60,37 @@ polygon
 sides,4
 density,5
 velocity,100,-10
-point,40,70
-point,50,70
-point,50,60
-point,40,60
+point,40,170
+point,50,170
+point,50,160
+point,40,160
 # Small square
 polygon
 sides,4
 density,5
-velocity,-200,20
-point,60,70
-point,70,70
-point,70,60
-point,60,60
+velocity,-120,20
+point,60,170
+point,70,170
+point,70,160
+point,60,160
 # Small square
 polygon
 sides,4
 density,5
 velocity,-200,50
-point,80,70
-point,90,70
-point,90,60
-point,80,60
+point,80,170
+point,90,170
+point,90,160
+point,80,160
 # Small square
 polygon
 sides,4
 density,5
 velocity,200,0
-point,100,70
-point,110,70
-point,110,60
-point,100,60
+point,100,170
+point,110,170
+point,110,160
+point,100,160
 # Large square
 polygon
 sides,4
