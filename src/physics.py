@@ -13,7 +13,7 @@ from   math import acos
 GRAVITY = np.array([0.0,9.8])
 EPSILON = 1e-7
 ELASTICITY = 0.5
-COLLISION_TOL = 1
+COLLISION_TOL = 12.1
 TIME_DISC = .1
 VIBRATE_TOL = 1e-5
 
@@ -65,11 +65,12 @@ class World:
         dt = self.time_disc
         max_collision_overlap = COLLISION_TOL + 1
         first_iter = True
+
+        # Check there is at least one 'true' collision, AND time is stable
         while max_collision_overlap > COLLISION_TOL and dt > EPSILON:       
             if first_iter:
                 first_iter = False
             else:
-                #print("collision (dt=%02f)" % dt)
                 dt /= 2
                 for obj in self.objs:
                     obj.reverse_update()
@@ -90,8 +91,9 @@ class World:
                 max_collision_overlap = max(magnitudes)
             else:
                 max_collision_overlap = 0
-            #print(max_collision_overlap)
-            
+        
+        if dt < EPSILON:
+            print("Warning: time became too small while still in collision.  ")
         while collisions:
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
                 
@@ -139,16 +141,23 @@ class World:
 
                 # Only other possible case is that both objects are free
                 else:
-                    mass_prop = obj2.mass / (obj1.mass + obj2.mass) 
-                    obj1.com.pos += (1-mass_prop) * (normal_vec)
+                    v1 = obj1.com.vel
+                    mtotal = obj1.mass + obj2.mass
+                    mprop1 = obj1.mass / mtotal 
+                    mprop2 = 1-mprop1 
+                    obj1.com.pos += mprop1 * (normal_vec)
+                    obj1.com.vel = (mprop1 - mprop2)*obj1.com.vel + 2*mprop2*obj2.com.vel
                     for point in obj1.points:
-                        point.pos += (1-mass_prop) * (normal_vec)
+                        point.pos += mprop1 * (normal_vec)
+                        point.vel = (mprop1 - mprop2)*point.vel + 2*mprop2*obj2.com.vel
                         
                     obj1.finish_update()
                     
-                    obj2.com.pos -= mass_prop * normal_vec
+                    obj2.com.pos -= mprop2 * normal_vec
+                    obj2.com.vel = 2*mprop1*v1 + (mprop2 - mprop1)*obj2.com.vel
                     for point in obj2.points:
-                        point.pos -= mass_prop * (normal_vec)
+                        point.pos -= mprop2 * (normal_vec)
+                        point.vel = 2*mprop1*v1 + (mprop2 - mprop1)*point.vel
                     obj2.finish_update()
 
             collisions = self.check_collisions()
@@ -178,6 +187,9 @@ class World:
                 if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
+                if self.verbosity >= 1:
+                    print([p.pos for p in obj.points])
+                    print([p.pos for p in other_obj.points])
                 correction, correct_mag, flag = polypoly_collision(obj, other_obj, verbosity = self.verbosity)
                 if len(correction) > 0:
                     collisions.append((obj, other_obj, correction, correct_mag, flag))
@@ -199,14 +211,16 @@ class World:
 class Obj:
     def __init__(self, points = [], world = None, mass = 1, 
                 pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
-                rotation_angle = 0.0, rotation_speed = 0.0):
+                rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
         
         self.points = points
         self.com = Point(
                 world, 
                 pos = sum([pt.pos for pt in points]) / len(points), 
-                mass = mass)
-        
+                mass = mass,
+                verbosity = verbosity
+                )
+        self.verbosity = verbosity
         self.mass = mass
         
         # Attributes of motion
@@ -281,6 +295,10 @@ class Obj:
         self.pos = np.array(self.com.pos, copy=True)
         self.vel = np.array(self.com.vel, copy=True)
         self.acc = np.array(self.com.acc, copy=True)
+    
+    def __str__(self):
+        return str(self)
+        
         
 
 class Point:
@@ -288,10 +306,12 @@ class Point:
                 world, 
                 mass = 1, 
                 pos = np.array([0.0,0.0]),
-                speed = np.array([150.0,0.0])
+                speed = np.array([150.0,0.0]),
+                verbosity = 0
                 ):
         
         self.name = "point"
+        self.verbosity = verbosity
 
         self.mass = mass
 
@@ -327,7 +347,8 @@ class Point:
         # Update velocity
         update_v += self.acc * halfdt
         self.vel = v_avg + (self.acc * halfdt)
-        
+        if self.verbosity:
+            print('update', update_x)
         return update_x, update_v, new_acc
 
 
@@ -352,9 +373,14 @@ class Point:
         The update values are the updates applied to the object's center of mass.  With rotation,
         this update will be more complex than a simple addition
         '''
+        if self.verbosity >= 1:
+            print(update_x, update_v, new_acc)
+
         self.pos += update_x
         self.vel += update_v
         self.acc = np.array(new_acc, copy=True)
+
+        com = obj.com
 
     def __str__(self):
         int_pos_x = int(self.pos[0])
@@ -366,11 +392,12 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+    def __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
         
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
+        self.verbosity = verbosity
     
     def moment_of_inertia(self, cached_I = None):
         '''
@@ -426,16 +453,17 @@ class Polygon(Obj):
         representation at a fixed point in time.
         '''
         
+        #return "polygon\nmass," + str(self.mass) + "\nsides," + str(len(self.points))+ "\n" + "\n".join([str(pt) for pt in self.points]) + "\n"
         return "polygon\nsides," + str(len(self.points))+ "\n" + "\n".join([str(pt) for pt in self.points]) + "\n"
 
 
 class Ball(Obj):
-    def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+    def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
         
         self.name = "circle"
 
         self.points = []
-        self.com = Point(world, pos = pos, mass = mass)
+        self.com = Point(world, pos = pos, mass = mass, verbosity = verbosity)
         self.radius = radius
         
         self.mass = mass
@@ -450,6 +478,7 @@ class Ball(Obj):
         self.world = world
         if world:
             world.init_obj(self)
+        self.verbosity = verbosity
 
     def __str__(self):
         return "circle\n" + str(int(self.pos[0])) + "," + str(int(self.pos[1])) + "," + str(int(self.radius)) + "\n"
@@ -467,13 +496,31 @@ class FixedPolygon(Polygon):
         
 
 def polypoly_collision(poly1, poly2, verbosity=0):
-    if verbosity:
-        print(poly1, poly2)
+    '''
+    Determine whether two polygons are currently intersecting each other
+    '''
+    
+    # array of edges in the form
+    # poly1_edges = [(Point1, Point2), (Point2, Point3), ..., (Point[n], Point1)]
     poly1_edges = list(zip(poly1.points[:-1], poly1.points[1:])) + [(poly1.points[-1], poly1.points[0])]
+    
+    # array of outward-facing normals for each of the previous edges
     poly1_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly1_edges]
     
     poly2_edges = list(zip(poly2.points[:-1], poly2.points[1:])) + [(poly2.points[-1], poly2.points[0])]
     poly2_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly2_edges]
+    
+    if verbosity >= 2:
+        print('IN COLLISION')
+        if verbosity >= 3:
+            #print(poly1_edges)
+            #print(poly2_edges)
+                print([p.pos for p in poly1.points[:-1]])
+                print([p.pos for p in poly2.points[:-1]])
+            #    print([(poly1.points[-1], poly1.points[0])])
+        #print(poly1_normals)
+        #print(poly2_edges)
+        #print(poly2_normals)
     
     overlap = np.inf
     for axis,flag in list(zip(poly1_normals,[1]*len(poly1_normals))) + list(zip(poly2_normals, [2]*len(poly2_normals))):
@@ -481,9 +528,13 @@ def polypoly_collision(poly1, poly2, verbosity=0):
         # Normalize
         normal_axis = axis / np.linalg.norm(axis)
         
+        # Determine projection bounds onto separating axis (perpindicular to separating line
+
+        # initialize bounds with current edge
         poly1_bounds = [np.dot(normal_axis, poly1.points[0].pos)]*2
         poly2_bounds = [np.dot(normal_axis, poly2.points[0].pos)]*2
-
+        
+        # increase bounds as necessary if other edges increase projection line length
         for point in poly1.points:
             curr = np.dot(normal_axis, point.pos)
             if curr < poly1_bounds[0]:
@@ -510,12 +561,20 @@ def polypoly_collision(poly1, poly2, verbosity=0):
         
         # Save axis and overlap magnitude if this is the smallest gap
         current_overlap = poly1_bounds[1] - poly2_bounds[0]
+        if verbosity:
+            print('co:',current_overlap,poly1_bounds,poly2_bounds)
         if current_overlap < overlap:
             fix_axis = normal_axis
             #fix_flag = flag
             fix_mag_flag = mag_flag
             overlap = current_overlap
-
+    
+    '''
+    Sanity Check: This whole fix_axis direction makes physical sense.  It 
+    is resolving the collision in a direction which *must* be orthogonal to one
+    of the two objects' sides, which should be the only way a collision could
+    happen, aside from some point-point intersection which is a.s. not the case.  
+    '''    
     #bounceback_displacement = fix_axis * overlap
     #return fix_axis, overlap, fix_flag, fix_mag_flag
     return fix_axis, overlap, fix_mag_flag

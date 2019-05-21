@@ -63,6 +63,9 @@ def read_input(fname, verbosity = 0):
                     points.append(point)
                     if npoints == 0:
                         if current_shape == "polygon":
+                            if mass == physics.np.inf:
+                                print("Warning: mass never set for polygon, set to 1")
+                                mass = 1
                             obj = physics.Polygon(world, points = points, mass = mass)
                         else:
                             obj = physics.FixedPolygon(world, points = points)
