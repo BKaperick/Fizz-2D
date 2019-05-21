@@ -146,18 +146,22 @@ class World:
                     mprop1 = obj1.mass / mtotal 
                     mprop2 = 1-mprop1 
                     obj1.com.pos += mprop1 * (normal_vec)
-                    obj1.com.vel = (mprop1 - mprop2)*obj1.com.vel + 2*mprop2*obj2.com.vel
+                    vn1 = np.dot(obj1.com.vel,unit_normal_vec)
+                    vn2 = np.dot(obj2.com.vel,unit_normal_vec)
+                    v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
+                    obj1.com.vel += (v1_update - np.dot(obj1.com.vel,unit_normal_vec))*unit_normal_vec
                     for point in obj1.points:
                         point.pos += mprop1 * (normal_vec)
-                        point.vel = (mprop1 - mprop2)*point.vel + 2*mprop2*obj2.com.vel
+                        point.vel += (v1_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
                         
                     obj1.finish_update()
                     
                     obj2.com.pos -= mprop2 * normal_vec
-                    obj2.com.vel = 2*mprop1*v1 + (mprop2 - mprop1)*obj2.com.vel
+                    v2_update = 2*mprop1*vn1 + (mprop2 - mprop1)*vn2
+                    obj2.com.vel += (v2_update - np.dot(obj2.com.vel,unit_normal_vec))*unit_normal_vec
                     for point in obj2.points:
                         point.pos -= mprop2 * (normal_vec)
-                        point.vel = 2*mprop1*v1 + (mprop2 - mprop1)*point.vel
+                        point.vel += (v2_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
                     obj2.finish_update()
 
             collisions = self.check_collisions()
