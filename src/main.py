@@ -39,8 +39,8 @@ def read_input(fname, verbosity = 0):
 
             if current_shape == "circle":
                 data = line.split(",")
-                if data[0] == "mass":
-                    mass = float(data[1])
+                if data[0] == "density":
+                    density = float(data[1])
                 else:
                     center_x = float(data[0])
                     center_y = float(data[1])
@@ -50,29 +50,32 @@ def read_input(fname, verbosity = 0):
             
             elif current_shape == "polygon" or current_shape == "fixedpolygon":
                 data = line.split(",")
-                if data[0] == "mass":
-                    mass = float(data[1])
+                if data[0] == "density":
+                    density = float(data[1])
                 elif data[0] == "sides":
                     sides = int(data[1])
                     npoints = sides
                     points = []
+                elif data[0] == "velocity":
+                    vel = physics.np.array([float(data[1]), float(data[2])])
                 elif data[0] == "point":
                     npoints -= 1
                     pp = [float(_) for _ in data[1:]]
-                    point = physics.Point(world, mass = mass / sides, pos = pp)
+                    point = physics.Point(world, pos = pp, speed = vel)
                     points.append(point)
                     if npoints == 0:
                         if current_shape == "polygon":
-                            if mass == physics.np.inf:
-                                print("Warning: mass never set for polygon, set to 1")
-                                mass = 1
-                            obj = physics.Polygon(world, points = points, mass = mass)
+                            if density == physics.np.inf:
+                                print("Warning: density never set for polygon, set to 1")
+                                density = 1
+                            obj = physics.Polygon(world, points = points, density = density, speed = vel)
                         else:
                             obj = physics.FixedPolygon(world, points = points)
                         current_shape = ""
             else:
+                vel = physics.np.array([0.0,0.0])
                 current_shape = line
-                mass = physics.np.inf
+                density = physics.np.inf
     return world
 
 

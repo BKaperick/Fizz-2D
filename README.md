@@ -8,14 +8,14 @@ Currently, I ran into some issues with `libpng 1.6.34` but had success installin
 
 To run the simulation, run
 
-    $./simulate.sh [INPUTFILE.in] [NUM_TIMESTEPS] [VERBOSITY]
+    $./simulate.sh [INPUTFILE] [NUM_TIMESTEPS] [VERBOSITY]
 
 Note: [VERBOSITY] is a nonnegative integer indicating how much debugging info you wish to be displayed.  VERBOSITY = 0 does not print anything.  If you do not include VERBOSITY, it defaults to 0.
 
 This script generates `.png` files of the form `plane_%d.png` in the `simulations` directory as well as `simul.gif`, which is the stitching of all these files into a single GIF.
 
-Here is an example from the latest simulation run.
-
+Here are some examples from the latest simulation run.
 
 ![Example 1](./simulations/simul.gif)
 ![Example 2](./simulations/simul2.gif)
+![Example 3](./simulations/simul3.gif)

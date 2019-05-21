@@ -35,7 +35,8 @@ point,10,299
 # Small square
 polygon
 sides,4
-mass,5
+density,5
+velocity,100,-10
 point,40,70
 point,50,70
 point,50,60
@@ -43,7 +44,8 @@ point,40,60
 # Small square
 polygon
 sides,4
-mass,5
+density,5
+velocity,-200,20
 point,60,70
 point,70,70
 point,70,60
@@ -51,7 +53,8 @@ point,60,60
 # Small square
 polygon
 sides,4
-mass,5
+density,5
+velocity,-200,50
 point,80,70
 point,90,70
 point,90,60
@@ -59,7 +62,8 @@ point,80,60
 # Small square
 polygon
 sides,4
-mass,5
+density,5
+velocity,200,0
 point,100,70
 point,110,70
 point,110,60
@@ -67,7 +71,8 @@ point,100,60
 # Large square
 polygon
 sides,4
-mass,5
+density,5
+velocity,50,0
 point,90,90
 point,110,90
 point,110,70

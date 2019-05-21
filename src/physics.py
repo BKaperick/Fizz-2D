@@ -7,12 +7,15 @@
 ###############################################################################
 
 import numpy as np
-from   math import acos
+from   math import acos,pi
 
 # World constants
 GRAVITY = np.array([0.0,9.8])
+DENSITY = .1
 EPSILON = 1e-7
-ELASTICITY = 0.5
+# 1 == perfectly elastic 
+# 0 == perfectly inelastic
+ELASTICITY = 0.0
 COLLISION_TOL = 12.1
 TIME_DISC = .1
 VIBRATE_TOL = 1e-5
@@ -40,6 +43,9 @@ class World:
 
         for obj in objs:
             self.init_obj(obj)
+
+        self.log = open('log.txt', 'a')
+
     
     def init_obj(self, obj):
         self.objs.append(obj)
@@ -49,13 +55,23 @@ class World:
 
     def init_fixed_obj(self, obj):
         self.fixed_objs.append(obj)
+    
+    def energy(self):
+        # total, kinetic, potential, heat
+        E = np.array([0.0,0.0,0.0,0.0])
+        for obj in self.objs:
+            E[1] += obj.k_energy()
+            E[2] += obj.p_energy()
+            E[2] += obj.h_energy()
+        E[0] = sum(E[1:3])
+        return E
 
     def update(self):
         '''
         This function is called once each time step.  All position and velocity
         updates, and all collisions are handled within.
         '''
-        
+        self.log.write(','.join([str(x) for x in self.energy()]) + '\n')
         # Apply linear damping force if exists
         if len(self.global_damping_force) == 0:
             gdf = []
@@ -121,20 +137,27 @@ class World:
                 #print(obj1.is_fixed, obj2.is_fixed)
                 if obj2.is_fixed:
                     
+                    #Jpart = (obj1.mass*obj2.mass/(obj1.mass + obj2.mass))*(1+CR)
+                    #obj1.com.vel += (Jpart/obj1.mass + Jpart/obj2.mass)*(v2n - v1n)*unit_normal_vec
                     for i in range(len(obj1.points)):
-                        #if np.linalg.norm(normal_vec) > VIBRATE_TOL:
                         obj1.points[i].pos += normal_vec
+
+                        ## This would work for inelastic collisions with others
+                        #obj1.points[i].vel += (Jpart/obj1.mass + Jpart/obj2.mass)*(unit_normal_vec)*(v2n - np.dot(obj1.points[i].vel,unit_normal_vec))
                         
                         vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
-                        #if np.linalg.norm(vdotN) > VIBRATE_TOL:
                         obj1.points[i].vel -= (1+ELASTICITY)*vdotN*unit_normal_vec
 
+                    # TODO: why is this here?
                     if np.linalg.norm(normal_vec) > VIBRATE_TOL:
                         obj1.com.pos += normal_vec
                     
                     vdotN = np.dot(obj1.com.vel, unit_normal_vec)
                     #if np.linalg.norm(vdotN) > VIBRATE_TOL:
+                    ##obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
+                    #J = obj1.mass*
                     obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
+
                     
                     obj1.finish_update()
                     obj2.finish_update()
@@ -149,6 +172,8 @@ class World:
                     vn1 = np.dot(obj1.com.vel,unit_normal_vec)
                     vn2 = np.dot(obj2.com.vel,unit_normal_vec)
                     v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
+                    if self.verbosity:
+                        print('mbefore:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
                     obj1.com.vel += (v1_update - np.dot(obj1.com.vel,unit_normal_vec))*unit_normal_vec
                     for point in obj1.points:
                         point.pos += mprop1 * (normal_vec)
@@ -159,6 +184,8 @@ class World:
                     obj2.com.pos -= mprop2 * normal_vec
                     v2_update = 2*mprop1*vn1 + (mprop2 - mprop1)*vn2
                     obj2.com.vel += (v2_update - np.dot(obj2.com.vel,unit_normal_vec))*unit_normal_vec
+                    if self.verbosity:
+                        print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
                     for point in obj2.points:
                         point.pos -= mprop2 * (normal_vec)
                         point.vel += (v2_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
@@ -213,19 +240,20 @@ class World:
 
 
 class Obj:
-    def __init__(self, points = [], world = None, mass = 1, 
+    def __init__(self, points = [], world = None, mass = 1, density = 1, 
                 pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
                 rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
-        
+        self.mass = mass
+        self.density = density
         self.points = points
         self.com = Point(
                 world, 
                 pos = sum([pt.pos for pt in points]) / len(points), 
                 mass = mass,
+                speed = speed,
                 verbosity = verbosity
                 )
         self.verbosity = verbosity
-        self.mass = mass
         
         # Attributes of motion
         self.pos = pos
@@ -243,7 +271,20 @@ class Obj:
             world.init_obj(self)
 
         self.is_fixed = False
+
+    def momentum(self, direction):
+        return self.mass * np.dot(self.com.vel, direction)/np.linalg.norm(direction)
     
+    def k_energy(self):
+        return self.mass * np.linalg.norm(self.vel)**2
+    
+    def p_energy(self):
+        p = -GRAVITY[1] * self.mass * self.pos[1]
+        return p
+
+    def h_energy(self):
+        return 0
+
     def pre_update(self, force, damping_force, dt):
         '''
         All points in the object are updated one step in accordance with the 
@@ -310,25 +351,23 @@ class Point:
                 world, 
                 mass = 1, 
                 pos = np.array([0.0,0.0]),
-                speed = np.array([150.0,0.0]),
+                speed = np.array([0.0,0.0]),
                 verbosity = 0
                 ):
         
         self.name = "point"
         self.verbosity = verbosity
 
-        self.mass = mass
-
         self.oldpos = np.array(pos, dtype=float)
         self.pos = np.array(pos, dtype=float)
 
         self.oldvel = speed
         self.vel = speed
-        
         self.oldacc = np.array([0.0,0.0])
         self.acc = np.array([0.0,0.0])
 
         self.world = world
+        self.mass = mass
 
 
     def move(self, forces, dt):
@@ -396,26 +435,54 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
-        
+    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
         self.verbosity = verbosity
+
+        self.cached_I = None
+        if density == np.inf:
+            self.mass = np.inf
+        else:
+            self.moment_of_inertia()
+            self.mass = self.area*density
+        
+        # second pass to fix masses  for unfixed polygons
+        for point in self.points:
+            point.mass = self.mass
     
-    def moment_of_inertia(self, cached_I = None):
+#    def area(self):
+#        if self.area:
+#            return self.area
+#        if len(self.points) == 3:
+#            p0,p1,p2 = [p.pos for p in self.points]
+#            self.area = triangle_area(p0,p1,p2)
+#        else:
+#            self.area = 0.0
+#            p0 = self.com.pos
+#            for point1,point2 in zip(self.points[:-1], self.points[1:]):
+#                
+#                p1 = point1.pos
+#                p2 = point2.pos
+#                area = triangle_area(p0,p1,p2)
+#                self.area += area
+#        return self.area
+
+
+    def moment_of_inertia(self):#, cached_I = None):
         '''
         Computes the moment of inertia by splitting polygon into triangles 
         cornered at self.com.
         '''
-        if cached_I:
-            return cached_I
+        if self.cached_I:
+            return self.cached_I
         if len(self.points) == 3:
             p0,p1,p2 = [p.pos for p in self.points]
             #area = triangle_area(p0,p1,p2)
             #com = (p0 + p1 + p2) / 3
             I = triangle_moment_of_inertia(p0,p1,p2)
-            cached_I = I
+            self.cached_I = I
         else:
             I = 0.0
             weighted_masses = 0.0
@@ -446,7 +513,7 @@ class Polygon(Obj):
             I += weighted_masses
 
             # Save value for next time
-            cached_I = I
+            self.cached_I = I
         return I
                 
     def __str__(self):
@@ -462,13 +529,14 @@ class Polygon(Obj):
 
 
 class Ball(Obj):
-    def __init__(self, world = None, mass = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
+    def __init__(self, world = None, density = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
         
         self.name = "circle"
 
         self.points = []
-        self.com = Point(world, pos = pos, mass = mass, verbosity = verbosity)
         self.radius = radius
+        self.mass = (self.radius**2) * pi * density
+        self.com = Point(world, pos = pos, mass = self.mass, verbosity = verbosity, speed = speed)
         
         self.mass = mass
         
@@ -491,9 +559,10 @@ class Ball(Obj):
 
 class FixedPolygon(Polygon):
     def __init__(self, world = None, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
-        super().__init__(world = None, mass = np.inf, points = points, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
+        super().__init__(world = None, density = np.inf, mass = np.inf, points = points, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
         self.name = "fixedpolygon"        
         self.world = world
+        self.mass = np.inf
         if world:
             world.init_fixed_obj(self)
         self.is_fixed = True
@@ -585,7 +654,7 @@ def polypoly_collision(poly1, poly2, verbosity=0):
     #return bounceback_displacement
     
 
-def triangle_area(p0,p1,p2):
+def triangle_area(pA,pB,pC):
     area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
     return area
 
@@ -601,13 +670,14 @@ def triangle_moment_of_inertia(p0,p1,p2):
 
     # Create new point where argmin of distance from p1 to the line 
     # between p0 and p2 occurs
-    xmin = (slope^2 * p0[0] + slope * p1[1] - slope * p0[1] + p1[0]) / (slope^2 + 1)
+    xmin = (slope**2 * p0[0] + slope * p1[1] - slope * p0[1] + p1[0]) / (slope**2 + 1)
     pmin = np.array([xmin, slope*(xmin - p0[0]) + p0[1]])
     
     a = np.linalg.norm(p0 - pmin)
     h = np.linalg.norm(p1 - pmin)
 
-    I = ((b^3)*h - (b^2)*h*a + b*h*(a^2) + b*(h^3)) / 36
+    I = ((b**3)*h - (b**2)*h*a + b*h*(a**2) + b*(h**3)) / 36
+    return I
 
 def find_closest_sides(poly1, poly2):
     p1_close_point1
