@@ -10,6 +10,7 @@ To run the simulation, run
 
     $./simulate.sh [INPUTFILE] [NUM_TIMESTEPS] [VERBOSITY] [PROFILE ENERGY]
 
+* [INPUTFILE] is a file which encodes the initial conditions for the simulation.  Numerous examples can be found in the `simulations` directory as any file of the form `*.in`.  Their names are loosely following the convention `[Description of fixed objects]_[List of movable objects, separated by '_'].in`.
 
 * [VERBOSITY] is a nonnegative integer indicating how much debugging info you wish to be displayed.  VERBOSITY = 0 does not print anything.  If you do not include VERBOSITY, it defaults to 0.
 
