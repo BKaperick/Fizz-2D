@@ -10,12 +10,13 @@ import numpy as np
 from   math import acos,pi
 
 # World constants
+SIMULATION_DIR = 'simulations/'
 GRAVITY = np.array([0.0,9.8])
 DENSITY = .1
 EPSILON = 1e-7
 # 1 == perfectly elastic 
 # 0 == perfectly inelastic
-ELASTICITY = 0.0
+ELASTICITY = 0.5
 COLLISION_TOL = 12.1
 TIME_DISC = .1
 VIBRATE_TOL = 1e-5
@@ -26,7 +27,8 @@ CONTACT_TOL = 1e-2
 class World:
     
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, 
-                 time_disc = TIME_DISC, gamma = [], verbosity = 0):
+                 time_disc = TIME_DISC, gamma = [], verbosity = 0, 
+                 energylog = 0):
         self.width = width
         self.height = height
         self.objs = []
@@ -34,6 +36,9 @@ class World:
         self.time_disc = time_disc
         self.state = 0
         self.verbosity = verbosity
+        self.energylog = energylog
+        if self.energylog:
+            self.log = open(SIMULATION_DIR + 'energy.txt', 'a+')
         
         self.global_accel = global_accel
         self.global_damping_force = np.array([])
@@ -44,7 +49,6 @@ class World:
         for obj in objs:
             self.init_obj(obj)
 
-        self.log = open('log.txt', 'a')
 
     
     def init_obj(self, obj):
@@ -62,8 +66,8 @@ class World:
         for obj in self.objs:
             E[1] += obj.k_energy()
             E[2] += obj.p_energy()
-            E[2] += obj.h_energy()
-        E[0] = sum(E[1:3])
+            E[3] += obj.heat
+        E[0] = sum(E[1:4])
         return E
 
     def update(self):
@@ -71,7 +75,8 @@ class World:
         This function is called once each time step.  All position and velocity
         updates, and all collisions are handled within.
         '''
-        self.log.write(','.join([str(x) for x in self.energy()]) + '\n')
+        if self.energylog:
+            self.log.write(','.join([str(x) for x in self.energy()]) + '\n')
         # Apply linear damping force if exists
         if len(self.global_damping_force) == 0:
             gdf = []
@@ -156,9 +161,16 @@ class World:
                     #if np.linalg.norm(vdotN) > VIBRATE_TOL:
                     ##obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
                     #J = obj1.mass*
+                    K0 = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
                     obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
-
                     
+                    # Update heat energy, dispersed equally to each object
+                    H = .5*obj1.mass*(1-ELASTICITY**2)*(vdotN**2)
+                    print("heat should be zero", H,ELASTICITY)
+                    K1 = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
+                    obj1.heat += H/2
+                    obj2.heat += H/2
+
                     obj1.finish_update()
                     obj2.finish_update()
 
@@ -173,7 +185,14 @@ class World:
                     vn2 = np.dot(obj2.com.vel,unit_normal_vec)
                     v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
                     if self.verbosity:
-                        print('mbefore:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
+                        v0a = np.copy(obj1.com.vel)
+                        v0b = np.copy(obj2.com.vel)
+                        print("inits", v0a,v0b)
+                        K0a = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
+                        K0b = .5*obj2.mass*np.linalg.norm(obj2.com.vel)**2
+                        print('K0a= ', K0a)
+                        print('K0b= ', K0b)
+                        #print('mbefore:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
                     obj1.com.vel += (v1_update - np.dot(obj1.com.vel,unit_normal_vec))*unit_normal_vec
                     for point in obj1.points:
                         point.pos += mprop1 * (normal_vec)
@@ -184,25 +203,33 @@ class World:
                     obj2.com.pos -= mprop2 * normal_vec
                     v2_update = 2*mprop1*vn1 + (mprop2 - mprop1)*vn2
                     obj2.com.vel += (v2_update - np.dot(obj2.com.vel,unit_normal_vec))*unit_normal_vec
-                    if self.verbosity:
-                        print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
                     for point in obj2.points:
                         point.pos -= mprop2 * (normal_vec)
                         point.vel += (v2_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
                     obj2.finish_update()
+                    if self.verbosity:
+                        print("inits", v0a,v0b)
+                        print("a_update=",vn2, v1_update)
+                        print("b_update=",vn1, v2_update)
+                        print("va1 =", obj1.com.vel, v0a+vn1)
+                        print("vb1 =", obj2.com.vel, v0b+vn2)
+                        print('K1a=',K0a + .5*obj1.mass*(vn1**2 - vn2**2), .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2)
+                        print('K1b=',K0b + .5*obj2.mass*(vn2**2 - vn1**2), .5*obj2.mass*np.linalg.norm(obj2.com.vel)**2)
+                        #print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
 
             collisions = self.check_collisions()
 
         # Do second (final) pass for each object in the world
         for obj in self.objs:
+            # Obj.com x,v,a attrs are given to Obj itself
             obj.finish_update()
         
         # Update the remainder of the time step
+        # ensures each frame transition is consistent time width
         for obj in self.objs:
             obj.pre_update([], gdf, self.time_disc - dt)
             obj.finish_update()
         
-    
         # Advance time
         self.state += self.time_disc
 
@@ -218,7 +245,7 @@ class World:
                 if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
-                if self.verbosity >= 1:
+                if self.verbosity >= 2:
                     print([p.pos for p in obj.points])
                     print([p.pos for p in other_obj.points])
                 correction, correct_mag, flag = polypoly_collision(obj, other_obj, verbosity = self.verbosity)
@@ -271,19 +298,18 @@ class Obj:
             world.init_obj(self)
 
         self.is_fixed = False
+        
+        self.heat = 0.0
 
     def momentum(self, direction):
         return self.mass * np.dot(self.com.vel, direction)/np.linalg.norm(direction)
     
     def k_energy(self):
-        return self.mass * np.linalg.norm(self.vel)**2
+        return .5*self.mass * np.linalg.norm(self.vel)**2
     
     def p_energy(self):
-        p = -GRAVITY[1] * self.mass * self.pos[1]
+        p = GRAVITY[1] * self.mass * (self.world.height-self.pos[1])
         return p
-
-    def h_energy(self):
-        return 0
 
     def pre_update(self, force, damping_force, dt):
         '''
@@ -304,7 +330,8 @@ class Obj:
         self.com.oldpos = np.copy(self.com.pos)
         self.com.oldvel = np.copy(self.com.vel)
         self.com.oldacc = np.copy(self.com.acc)
-
+        
+        # Use time-integrator of choice to find new x,v,a
         self.update_x, self.update_v, self.new_acc = self.com.move(force, dt)
 
         for point in self.points:
@@ -314,6 +341,7 @@ class Obj:
             point.oldvel = np.copy(point.vel)
             point.oldacc = np.copy(point.acc)
             
+            # update point x,v,a values
             point.update_with_object(self, self.update_x, self.update_v, self.new_acc)
 
     def reverse_update(self):
@@ -390,7 +418,7 @@ class Point:
         # Update velocity
         update_v += self.acc * halfdt
         self.vel = v_avg + (self.acc * halfdt)
-        if self.verbosity:
+        if self.verbosity > 1:
             print('update', update_x)
         return update_x, update_v, new_acc
 
@@ -416,7 +444,7 @@ class Point:
         The update values are the updates applied to the object's center of mass.  With rotation,
         this update will be more complex than a simple addition
         '''
-        if self.verbosity >= 1:
+        if self.verbosity > 1:
             print(update_x, update_v, new_acc)
 
         self.pos += update_x
@@ -635,7 +663,7 @@ def polypoly_collision(poly1, poly2, verbosity=0):
         
         # Save axis and overlap magnitude if this is the smallest gap
         current_overlap = poly1_bounds[1] - poly2_bounds[0]
-        if verbosity:
+        if verbosity>1:
             print('co:',current_overlap,poly1_bounds,poly2_bounds)
         if current_overlap < overlap:
             fix_axis = normal_axis

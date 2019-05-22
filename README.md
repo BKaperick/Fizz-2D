@@ -8,9 +8,12 @@ Currently, I ran into some issues with `libpng 1.6.34` but had success installin
 
 To run the simulation, run
 
-    $./simulate.sh [INPUTFILE] [NUM_TIMESTEPS] [VERBOSITY]
+    $./simulate.sh [INPUTFILE] [NUM_TIMESTEPS] [VERBOSITY] [PROFILE ENERGY]
 
-Note: [VERBOSITY] is a nonnegative integer indicating how much debugging info you wish to be displayed.  VERBOSITY = 0 does not print anything.  If you do not include VERBOSITY, it defaults to 0.
+
+* [VERBOSITY] is a nonnegative integer indicating how much debugging info you wish to be displayed.  VERBOSITY = 0 does not print anything.  If you do not include VERBOSITY, it defaults to 0.
+
+* [PROFILE ENERGY] is 0 or 1.  If selected, plots the kinetic, potential, heat, and total energy for the system over time.  Additionally, it saves `energy.txt` in the simulations directory in CSV format.  
 
 This script generates `.png` files of the form `plane_%d.png` in the `simulations` directory as well as `simul.gif`, which is the stitching of all these files into a single GIF.
 

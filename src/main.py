@@ -9,19 +9,21 @@
 # ARGV[1] - INPUT FILE
 # ARGV[2] - NUMBER OF TIME STEPS
 # ARGV[3] - VERBOSITY (OPTIONAL)
+# ARGV[4] - ENERGY LOG (OPTIONAL)
 
 import physics
 from sys import argv
 import subprocess
 import os
 import time
+from plot import plot_energy
 
-def read_input(fname, verbosity = 0):
+def read_input(fname, verbosity = 0, energylog = 0):
     with open(fname, "r") as f:
 
         # First line of file is the dimension of the frame in pixels
         w, h = [int(x) for x in f.readline().strip().split(",")]
-        world = physics.World(width=w, height = h, verbosity = verbosity)
+        world = physics.World(width=w, height = h, verbosity = verbosity, energylog = energylog)
 
         current_shape = ""
         for line in f.readlines():
@@ -83,7 +85,8 @@ if __name__ == '__main__':
         
     num_iters = int(argv[2])
     verbosity = int(argv[3]) if len(argv) >= 4 else 0
-    plane = read_input(argv[1], verbosity)
+    energylog = int(argv[4]) if len(argv) >= 5 else 0
+    plane = read_input(argv[1], verbosity, energylog)
     processes = []
     for t in range(num_iters):
         plane.update()
@@ -91,7 +94,7 @@ if __name__ == '__main__':
         #for i,obj in enumerate(plane.objs):
         #    print(obj.name,i, obj.pos, obj.vel, obj.acc)
         #    pass
-        with open("./simulations/plane_%03d.txt" % t, "w") as f:
+        with open(physics.SIMULATION_DIR + "plane_%03d.txt" % t, "w") as f:
             f.write(str(plane))
         if t and t % 126 == 0:
             start = time.time()
@@ -107,3 +110,8 @@ if __name__ == '__main__':
     # if all pngs are not created 
     for p in processes:
         p.wait()
+    
+    # Lastly, display energy
+    if energylog:
+        plane.log.close()
+        plot_energy(physics.SIMULATION_DIR+'energy.txt')
