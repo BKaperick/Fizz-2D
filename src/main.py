@@ -17,6 +17,7 @@ import subprocess
 import os
 import time
 from plot import plot_energy
+from config import SIMULATION_DIR
 
 def read_input(fname, verbosity = 0, energylog = 0):
     with open(fname, "r") as f:
@@ -94,7 +95,7 @@ if __name__ == '__main__':
         #for i,obj in enumerate(plane.objs):
         #    print(obj.name,i, obj.pos, obj.vel, obj.acc)
         #    pass
-        with open(physics.SIMULATION_DIR + "plane_%03d.txt" % t, "w") as f:
+        with open(SIMULATION_DIR + "plane_%03d.txt" % t, "w") as f:
             f.write(str(plane))
         if t and t % 126 == 0:
             start = time.time()
@@ -114,4 +115,4 @@ if __name__ == '__main__':
     # Lastly, display energy
     if energylog:
         plane.log.close()
-        plot_energy(physics.SIMULATION_DIR+'energy.txt')
+        plot_energy(SIMULATION_DIR+'energy.txt')

@@ -29,16 +29,18 @@ point,949,300
 point,949,251
 # Left Object
 polygon
-mass,1
+density,1
 sides,4
+velocity,150,0
 point,100,100
 point,100,150
 point,150,150
 point,150,100
 # Right Object
 polygon
-mass,1
+density,1
 sides,4
+velocity,-150,0
 point,900,100
 point,900,150
 point,850,150

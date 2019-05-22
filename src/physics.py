@@ -8,15 +8,15 @@
 
 import numpy as np
 from   math import acos,pi
+from config import SIMULATION_DIR
 
 # World constants
-SIMULATION_DIR = 'simulations/'
 GRAVITY = np.array([0.0,9.8])
 DENSITY = .1
 EPSILON = 1e-7
 # 1 == perfectly elastic 
 # 0 == perfectly inelastic
-ELASTICITY = 0.5
+ELASTICITY = .50
 COLLISION_TOL = 12.1
 TIME_DISC = .1
 VIBRATE_TOL = 1e-5
@@ -49,6 +49,8 @@ class World:
         for obj in objs:
             self.init_obj(obj)
 
+        # Heat contained in all objects
+        self.heat = 0
 
     
     def init_obj(self, obj):
@@ -66,7 +68,7 @@ class World:
         for obj in self.objs:
             E[1] += obj.k_energy()
             E[2] += obj.p_energy()
-            E[3] += obj.heat
+        E[3] = self.heat    
         E[0] = sum(E[1:4])
         return E
 
@@ -166,10 +168,10 @@ class World:
                     
                     # Update heat energy, dispersed equally to each object
                     H = .5*obj1.mass*(1-ELASTICITY**2)*(vdotN**2)
-                    print("heat should be zero", H,ELASTICITY)
                     K1 = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
                     obj1.heat += H/2
                     obj2.heat += H/2
+                    self.heat += H
 
                     obj1.finish_update()
                     obj2.finish_update()
