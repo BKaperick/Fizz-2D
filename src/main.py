@@ -17,14 +17,15 @@ import subprocess
 import os
 import time
 from plot import plot_energy
+import config
 from config import SIMULATION_DIR
 
-def read_input(fname, verbosity = 0, energylog = 0):
+def read_input(fname, energylog = 0):
     with open(fname, "r") as f:
 
         # First line of file is the dimension of the frame in pixels
         w, h = [int(x) for x in f.readline().strip().split(",")]
-        world = physics.World(width=w, height = h, verbosity = verbosity, energylog = energylog)
+        world = physics.World(width=w, height = h)
 
         current_shape = ""
         for line in f.readlines():
@@ -85,9 +86,11 @@ def read_input(fname, verbosity = 0, energylog = 0):
 if __name__ == '__main__':
         
     num_iters = int(argv[2])
-    verbosity = int(argv[3]) if len(argv) >= 4 else 0
-    energylog = int(argv[4]) if len(argv) >= 5 else 0
-    plane = read_input(argv[1], verbosity, energylog)
+
+    # Override defaults set in config.py
+    physics.verbosity = int(argv[3]) if len(argv) >= 4 else config.VERBOSITY
+    physics.energylog = int(argv[4]) if len(argv) >= 5 else config.ENERGYLOG
+    plane = read_input(argv[1])
     processes = []
     for t in range(num_iters):
         plane.update()
@@ -113,6 +116,6 @@ if __name__ == '__main__':
         p.wait()
     
     # Lastly, display energy
-    if energylog:
+    if config.ENERGYLOG:
         plane.log.close()
         plot_energy(SIMULATION_DIR+'energy.txt')

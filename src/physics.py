@@ -8,10 +8,11 @@
 
 import numpy as np
 from   math import acos,pi
+import config
 from config import SIMULATION_DIR
 
 # World constants
-GRAVITY = np.array([0.0,9.8])
+GRAVITY = np.array([0.0,200])
 DENSITY = .1
 EPSILON = 1e-7
 # 1 == perfectly elastic 
@@ -27,17 +28,14 @@ CONTACT_TOL = 1e-2
 class World:
     
     def __init__(self, width, height, objs = set(), global_accel = GRAVITY, 
-                 time_disc = TIME_DISC, gamma = [], verbosity = 0, 
-                 energylog = 0):
+                 time_disc = TIME_DISC, gamma = []):
         self.width = width
         self.height = height
         self.objs = []
         self.fixed_objs = []
         self.time_disc = time_disc
         self.state = 0
-        self.verbosity = verbosity
-        self.energylog = energylog
-        if self.energylog:
+        if config.ENERGYLOG:
             self.log = open(SIMULATION_DIR + 'energy.txt', 'a+')
         
         self.global_accel = global_accel
@@ -77,7 +75,7 @@ class World:
         This function is called once each time step.  All position and velocity
         updates, and all collisions are handled within.
         '''
-        if self.energylog:
+        if config.ENERGYLOG:
             self.log.write(','.join([str(x) for x in self.energy()]) + '\n')
         # Apply linear damping force if exists
         if len(self.global_damping_force) == 0:
@@ -186,7 +184,7 @@ class World:
                     vn1 = np.dot(obj1.com.vel,unit_normal_vec)
                     vn2 = np.dot(obj2.com.vel,unit_normal_vec)
                     v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
-                    if self.verbosity:
+                    if verbosity:
                         v0a = np.copy(obj1.com.vel)
                         v0b = np.copy(obj2.com.vel)
                         print("inits", v0a,v0b)
@@ -209,7 +207,7 @@ class World:
                         point.pos -= mprop2 * (normal_vec)
                         point.vel += (v2_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
                     obj2.finish_update()
-                    if self.verbosity:
+                    if verbosity:
                         print("inits", v0a,v0b)
                         print("a_update=",vn2, v1_update)
                         print("b_update=",vn1, v2_update)
@@ -247,10 +245,10 @@ class World:
                 if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
-                if self.verbosity >= 2:
+                if verbosity >= 2:
                     print([p.pos for p in obj.points])
                     print([p.pos for p in other_obj.points])
-                correction, correct_mag, flag = polypoly_collision(obj, other_obj, verbosity = self.verbosity)
+                correction, correct_mag, flag = polypoly_collision(obj, other_obj)
                 if len(correction) > 0:
                     collisions.append((obj, other_obj, correction, correct_mag, flag))
         return collisions
@@ -271,7 +269,7 @@ class World:
 class Obj:
     def __init__(self, points = [], world = None, mass = 1, density = 1, 
                 pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
-                rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
+                rotation_angle = 0.0, rotation_speed = 0.0):
         self.mass = mass
         self.density = density
         self.points = points
@@ -280,9 +278,7 @@ class Obj:
                 pos = sum([pt.pos for pt in points]) / len(points), 
                 mass = mass,
                 speed = speed,
-                verbosity = verbosity
                 )
-        self.verbosity = verbosity
         
         # Attributes of motion
         self.pos = pos
@@ -310,6 +306,7 @@ class Obj:
         return .5*self.mass * np.linalg.norm(self.vel)**2
     
     def p_energy(self):
+        # TODO: Fix to always be parallel to gravity in arbitrary direction 
         p = GRAVITY[1] * self.mass * (self.world.height-self.pos[1])
         return p
 
@@ -382,11 +379,9 @@ class Point:
                 mass = 1, 
                 pos = np.array([0.0,0.0]),
                 speed = np.array([0.0,0.0]),
-                verbosity = 0
                 ):
         
         self.name = "point"
-        self.verbosity = verbosity
 
         self.oldpos = np.array(pos, dtype=float)
         self.pos = np.array(pos, dtype=float)
@@ -420,7 +415,7 @@ class Point:
         # Update velocity
         update_v += self.acc * halfdt
         self.vel = v_avg + (self.acc * halfdt)
-        if self.verbosity > 1:
+        if verbosity > 1:
             print('update', update_x)
         return update_x, update_v, new_acc
 
@@ -446,7 +441,7 @@ class Point:
         The update values are the updates applied to the object's center of mass.  With rotation,
         this update will be more complex than a simple addition
         '''
-        if self.verbosity > 1:
+        if verbosity > 1:
             print(update_x, update_v, new_acc)
 
         self.pos += update_x
@@ -465,11 +460,10 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
+    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
-        self.verbosity = verbosity
 
         self.cached_I = None
         if density == np.inf:
@@ -477,6 +471,10 @@ class Polygon(Obj):
         else:
             self.moment_of_inertia()
             self.mass = self.area*density
+            if verbosity:
+                print('mass:',self.mass)
+                print('height:',self.pos[1])
+                print('potent:',self.p_energy())
         
         # second pass to fix masses  for unfixed polygons
         for point in self.points:
@@ -560,14 +558,14 @@ class Polygon(Obj):
 
 
 class Ball(Obj):
-    def __init__(self, world = None, density = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0, verbosity = 0):
+    def __init__(self, world = None, density = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
         
         self.name = "circle"
 
         self.points = []
         self.radius = radius
         self.mass = (self.radius**2) * pi * density
-        self.com = Point(world, pos = pos, mass = self.mass, verbosity = verbosity, speed = speed)
+        self.com = Point(world, pos = pos, mass = self.mass, speed = speed)
         
         self.mass = mass
         
@@ -581,7 +579,6 @@ class Ball(Obj):
         self.world = world
         if world:
             world.init_obj(self)
-        self.verbosity = verbosity
 
     def __str__(self):
         return "circle\n" + str(int(self.pos[0])) + "," + str(int(self.pos[1])) + "," + str(int(self.radius)) + "\n"
@@ -599,7 +596,7 @@ class FixedPolygon(Polygon):
         self.is_fixed = True
         
 
-def polypoly_collision(poly1, poly2, verbosity=0):
+def polypoly_collision(poly1, poly2):
     '''
     Determine whether two polygons are currently intersecting each other
     '''
