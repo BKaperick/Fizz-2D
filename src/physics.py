@@ -35,7 +35,7 @@ class World:
         self.fixed_objs = []
         self.time_disc = time_disc
         self.state = 0
-        if config.ENERGYLOG:
+        if energylog:
             self.log = open(SIMULATION_DIR + 'energy.txt', 'a+')
         
         self.global_accel = global_accel
@@ -75,7 +75,7 @@ class World:
         This function is called once each time step.  All position and velocity
         updates, and all collisions are handled within.
         '''
-        if config.ENERGYLOG:
+        if energylog:
             self.log.write(','.join([str(x) for x in self.energy()]) + '\n')
         # Apply linear damping force if exists
         if len(self.global_damping_force) == 0:

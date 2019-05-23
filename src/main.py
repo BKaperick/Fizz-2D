@@ -116,6 +116,6 @@ if __name__ == '__main__':
         p.wait()
     
     # Lastly, display energy
-    if config.ENERGYLOG:
+    if physics.energylog:
         plane.log.close()
         plot_energy(SIMULATION_DIR+'energy.txt')
