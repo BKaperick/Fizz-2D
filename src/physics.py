@@ -517,7 +517,10 @@ class Polygon(Obj):
             weighted_masses = 0.0
             self.area = 0.0
             p0 = self.com.pos
-            for point1,point2 in zip(self.points[:-1], self.points[1:]):
+            from collections import deque
+            #for point1,point2 in zip(self.points,deque(self.points).rotate(-1)):
+            for point1,point2 in zip(self.points, self.points[1:]+[self.points[0]]):
+            #for point1,point2 in zip(self.points[:-1], self.points[1:]):
                 
                 p1 = point1.pos
                 p2 = point2.pos
@@ -603,12 +606,12 @@ def polypoly_collision(poly1, poly2):
     
     # array of edges in the form
     # poly1_edges = [(Point1, Point2), (Point2, Point3), ..., (Point[n], Point1)]
-    poly1_edges = list(zip(poly1.points[:-1], poly1.points[1:])) + [(poly1.points[-1], poly1.points[0])]
+    poly1_edges = zip(poly1.points, poly1.points[1:] + [poly1.points[0]])
     
     # array of outward-facing normals for each of the previous edges
     poly1_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly1_edges]
     
-    poly2_edges = list(zip(poly2.points[:-1], poly2.points[1:])) + [(poly2.points[-1], poly2.points[0])]
+    poly2_edges = zip(poly2.points, poly2.points[1:] + [poly2.points[0]])
     poly2_normals = [np.array([p2.pos[1] - p1.pos[1], p1.pos[0] - p2.pos[0]]) for p1,p2 in poly2_edges]
     
     if verbosity >= 2:
@@ -683,6 +686,8 @@ def polypoly_collision(poly1, poly2):
     
 
 def triangle_area(pA,pB,pC):
+    if verbosity:
+        print(pA,pB,pC)
     area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
     return area
 
