@@ -7,22 +7,23 @@
 ###############################################################################
 
 import numpy as np
+from numpy.linalg import norm 
 from   math import acos,pi
 import config
-from config import SIMULATION_DIR
 
 # World constants
-GRAVITY = np.array([0.0,200])
+GRAVITY = np.array([0.0,9.8])
 DENSITY = .1
-EPSILON = 1e-7
+EPSILON = 1e-12
 # 1 == perfectly elastic 
 # 0 == perfectly inelastic
 ELASTICITY = .50
-COLLISION_TOL = 12.1
-TIME_DISC = .1
+TIME_TOL = 1e-10
+COLLISION_TOL = 2
+TIME_DISC = .01
 VIBRATE_TOL = 1e-5
 
-ANGLE_TOL = 1e-2
+ANGLE_TOL = 1e-4
 CONTACT_TOL = 1e-2
 
 class World:
@@ -36,7 +37,7 @@ class World:
         self.time_disc = time_disc
         self.state = 0
         if energylog:
-            self.log = open(SIMULATION_DIR + 'energy.txt', 'a+')
+            self.log = open(config.SIMULATION_DIR + 'energy.txt', 'a+')
         
         self.global_accel = global_accel
         self.global_damping_force = np.array([])
@@ -88,7 +89,9 @@ class World:
         first_iter = True
 
         # Check there is at least one 'true' collision, AND time is stable
-        while max_collision_overlap > COLLISION_TOL and dt > EPSILON:       
+        if verbosity>2:
+            print('in:',self.objs[0].com.pos[1])
+        while max_collision_overlap > COLLISION_TOL and dt > TIME_TOL:       
             if first_iter:
                 first_iter = False
             else:
@@ -99,7 +102,18 @@ class World:
             # Do first pass of position, velocity and acceleration updates for 
             # each object in the world
             for obj in self.objs:
-                obj.pre_update([], gdf, dt)
+                obj.forces = []
+                #TODO: incorporate normal force 
+#                for obj2 in self.objs:
+#                    if obj != obj2:
+#                        [length, normal] = side_contect(obj,obj2)
+#                        if length:
+#                            obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
+                for fobj in self.fixed_objs:
+                    (length, normal) = side_contact(obj,fobj)
+                    if length:
+                        obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
+                obj.pre_update(obj.forces, gdf, dt)
 
             # check_collisions() compiles a list of collisions with information:
             #   (1,2) the two objects contained in the collision
@@ -112,8 +126,10 @@ class World:
                 max_collision_overlap = max(magnitudes)
             else:
                 max_collision_overlap = 0
-        
-        if dt < EPSILON:
+            if max_collision_overlap > 0:
+                if verbosity > 1:
+                    print(dt,max_collision_overlap, self.objs[0].com.pos[1])
+        if dt < TIME_TOL:
             print("Warning: time became too small while still in collision.  ")
         while collisions:
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
@@ -126,6 +142,8 @@ class World:
                 # objects are definitely non-overlapping after collision 
                 # resolution
                 normal_vec = unit_normal_vec * (normal_vec_mag + EPSILON)
+                if verbosity:
+                    print("normal vec: ", normal_vec)
                 
                 # If flag, the normal vector needs to be flipped
                 if flag == 1:
@@ -154,19 +172,19 @@ class World:
                         obj1.points[i].vel -= (1+ELASTICITY)*vdotN*unit_normal_vec
 
                     # TODO: why is this here?
-                    if np.linalg.norm(normal_vec) > VIBRATE_TOL:
+                    if norm(normal_vec) > VIBRATE_TOL:
                         obj1.com.pos += normal_vec
                     
                     vdotN = np.dot(obj1.com.vel, unit_normal_vec)
-                    #if np.linalg.norm(vdotN) > VIBRATE_TOL:
+                    #if norm(vdotN) > VIBRATE_TOL:
                     ##obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
                     #J = obj1.mass*
-                    K0 = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
+                    K0 = .5*obj1.mass*norm(obj1.com.vel)**2
                     obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
                     
                     # Update heat energy, dispersed equally to each object
                     H = .5*obj1.mass*(1-ELASTICITY**2)*(vdotN**2)
-                    K1 = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
+                    K1 = .5*obj1.mass*norm(obj1.com.vel)**2
                     obj1.heat += H/2
                     obj2.heat += H/2
                     self.heat += H
@@ -188,8 +206,8 @@ class World:
                         v0a = np.copy(obj1.com.vel)
                         v0b = np.copy(obj2.com.vel)
                         print("inits", v0a,v0b)
-                        K0a = .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2
-                        K0b = .5*obj2.mass*np.linalg.norm(obj2.com.vel)**2
+                        K0a = .5*obj1.mass*norm(obj1.com.vel)**2
+                        K0b = .5*obj2.mass*norm(obj2.com.vel)**2
                         print('K0a= ', K0a)
                         print('K0b= ', K0b)
                         #print('mbefore:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
@@ -213,8 +231,8 @@ class World:
                         print("b_update=",vn1, v2_update)
                         print("va1 =", obj1.com.vel, v0a+vn1)
                         print("vb1 =", obj2.com.vel, v0b+vn2)
-                        print('K1a=',K0a + .5*obj1.mass*(vn1**2 - vn2**2), .5*obj1.mass*np.linalg.norm(obj1.com.vel)**2)
-                        print('K1b=',K0b + .5*obj2.mass*(vn2**2 - vn1**2), .5*obj2.mass*np.linalg.norm(obj2.com.vel)**2)
+                        print('K1a=',K0a + .5*obj1.mass*(vn1**2 - vn2**2), .5*obj1.mass*norm(obj1.com.vel)**2)
+                        print('K1b=',K0b + .5*obj2.mass*(vn2**2 - vn1**2), .5*obj2.mass*norm(obj2.com.vel)**2)
                         #print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
 
             collisions = self.check_collisions()
@@ -273,12 +291,15 @@ class Obj:
         self.mass = mass
         self.density = density
         self.points = points
+        
+        com_pos = sum([pt.pos for pt in points]) / len(points)
         self.com = Point(
                 world, 
-                pos = sum([pt.pos for pt in points]) / len(points), 
+                pos = com_pos, 
                 mass = mass,
                 speed = speed,
                 )
+        self.radius = max([norm(pt.pos - com_pos) for pt in points])
         
         # Attributes of motion
         self.pos = pos
@@ -300,15 +321,23 @@ class Obj:
         self.heat = 0.0
 
     def momentum(self, direction):
-        return self.mass * np.dot(self.com.vel, direction)/np.linalg.norm(direction)
+        return self.mass * np.dot(self.com.vel, direction)/norm(direction)
     
     def k_energy(self):
-        return .5*self.mass * np.linalg.norm(self.vel)**2
+        return .5*self.mass * norm(self.vel)**2
     
     def p_energy(self):
         # TODO: Fix to always be parallel to gravity in arbitrary direction 
         p = GRAVITY[1] * self.mass * (self.world.height-self.pos[1])
         return p
+
+    def side_pos_iter(self):
+        '''
+        Simple generator to yield a common need:
+        endpoint positions of each side, and a vector centered at zero
+        '''
+        for p1,p2 in zip(self.points, self.points[1:]+[self.points[0]]):
+            yield p1.pos,p2.pos,p2.pos-p1.pos
 
     def pre_update(self, force, damping_force, dt):
         '''
@@ -464,6 +493,9 @@ class Polygon(Obj):
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
+        
+        self.pos = self.com.pos
+        self.vel = self.com.vel
 
         self.cached_I = None
         if density == np.inf:
@@ -517,7 +549,6 @@ class Polygon(Obj):
             weighted_masses = 0.0
             self.area = 0.0
             p0 = self.com.pos
-            from collections import deque
             #for point1,point2 in zip(self.points,deque(self.points).rotate(-1)):
             for point1,point2 in zip(self.points, self.points[1:]+[self.points[0]]):
             #for point1,point2 in zip(self.points[:-1], self.points[1:]):
@@ -528,7 +559,7 @@ class Polygon(Obj):
 
                 # Weight the mass of each triangle by its distance from the COM of the polygon
                 com = (p0 + p1 + p2) / 3
-                dsquared = np.linalg.norm(com - p0)
+                dsquared = norm(com - p0)
 
                 
                 # Compute area of polygon "for free"
@@ -617,20 +648,14 @@ def polypoly_collision(poly1, poly2):
     if verbosity >= 2:
         print('IN COLLISION')
         if verbosity >= 3:
-            #print(poly1_edges)
-            #print(poly2_edges)
-                print([p.pos for p in poly1.points[:-1]])
-                print([p.pos for p in poly2.points[:-1]])
-            #    print([(poly1.points[-1], poly1.points[0])])
-        #print(poly1_normals)
-        #print(poly2_edges)
-        #print(poly2_normals)
+            print([p.pos for p in poly1.points[:-1]])
+            print([p.pos for p in poly2.points[:-1]])
     
     overlap = np.inf
     for axis,flag in list(zip(poly1_normals,[1]*len(poly1_normals))) + list(zip(poly2_normals, [2]*len(poly2_normals))):
         
         # Normalize
-        normal_axis = axis / np.linalg.norm(axis)
+        normal_axis = axis / norm(axis)
         
         # Determine projection bounds onto separating axis (perpindicular to separating line
 
@@ -669,7 +694,6 @@ def polypoly_collision(poly1, poly2):
             print('co:',current_overlap,poly1_bounds,poly2_bounds)
         if current_overlap < overlap:
             fix_axis = normal_axis
-            #fix_flag = flag
             fix_mag_flag = mag_flag
             overlap = current_overlap
     
@@ -679,10 +703,7 @@ def polypoly_collision(poly1, poly2):
     of the two objects' sides, which should be the only way a collision could
     happen, aside from some point-point intersection which is a.s. not the case.  
     '''    
-    #bounceback_displacement = fix_axis * overlap
-    #return fix_axis, overlap, fix_flag, fix_mag_flag
     return fix_axis, overlap, fix_mag_flag
-    #return bounceback_displacement
     
 
 def triangle_area(pA,pB,pC):
@@ -699,91 +720,52 @@ def triangle_moment_of_inertia(p0,p1,p2):
         p1,p2,p0 = p0,p1,p2
 
     slope = (p2[1] - p0[1]) / (p2[0] - p0[0])
-    b = np.linalg.norm(p2 - p0)
+    b = norm(p2 - p0)
 
     # Create new point where argmin of distance from p1 to the line 
     # between p0 and p2 occurs
     xmin = (slope**2 * p0[0] + slope * p1[1] - slope * p0[1] + p1[0]) / (slope**2 + 1)
     pmin = np.array([xmin, slope*(xmin - p0[0]) + p0[1]])
     
-    a = np.linalg.norm(p0 - pmin)
-    h = np.linalg.norm(p1 - pmin)
+    a = norm(p0 - pmin)
+    h = norm(p1 - pmin)
 
     I = ((b**3)*h - (b**2)*h*a + b*h*(a**2) + b*(h**3)) / 36
     return I
 
-def find_closest_sides(poly1, poly2):
-    p1_close_point1
-    p1_close_point2
-    p1_error1 = np.inf
-    p1_error2 = np.inf
-
-    for p1_ind,point in enumerate(poly1.points):
-        
-        error1 = np.inf
-        error2 = np.inf
-        [abs(point.pos - p.pos) for p in poly2.points]
-        error, ind = min((val, idx) for (idx, val) in enumerate([np.linalg.norm(point.pos - p.pos) for p in poly2.points]))
-        if error < error2:
-            if error < error1:
-                
-                ind2 = ind1
-                ind1 = ind
-                
-                error2 = error1
-                error1 = error
-                
-                p1_ind2 = p1_ind1
-                p1_ind1 = p1_ind
-
-            else:
-                ind2 = ind
-                error2 = error
-                p1_ind2 = p1_ind
-    
-    p1_point1 = poly1.points[p1_ind1] 
-    p1_point2 = poly1.points[p1_ind2]
-    
-    point1 = poly2.points[ind1] 
-    point2 = poly2.points[ind2]
-
-    return p1_point1, p1_point2, point1, point2
-
 
 def side_contact(poly1, poly2):
     '''
-    Returns a boolean determining whether two objects are in "face-to-face" contact.
+    returns a boolean determining whether two objects are in "face-to-face" contact.
     '''
-    points = find_closest_sides(poly1, poly2)
-    p11,p12,p21,p22 = [p.pos for p in points]
-    
-    # Translate the two vectors so they're rooted at (0,0)
-    p1 = np.array(p12[0] - p11[0], p12[1] - p11[1])
-    p2 = np.array(p22[0] - p21[0], p22[1] - p21[1])
-    
-    costheta = (p12[0] - p11[0]) * (p22[0] - p21[0]) + (p12[1] - p11[1]) * (p22[1] - p21[1])
-    costheta /= (np.linalg.norm(p12 - p11) * np.linalg.norm(p22 - p21))
-    
-    if 1 - abs(costheta) >= ANGLE_TOL:
-        return False
-    det = (p21[0]*p22[1] - p12[1]*p22[0])
 
-    # Applies rotation and shift
-    change_coords = lambda p: np.array([p[0] - p21[0], p[0] * (p21[1]*p22[1]/det) + p[1] * (-p21[1]*p22[0]/det) - p21[1]])
-    p11 = change_coords(p11)
-    p12 = change_coords(p12)
-    p21 = np.array([0.0,0.0])
-    p22 = np.array([p22[0] - p21[0], 0.0])
-    
+    # first check if the polygons can possibly be in contact
+    # note: we don't need to factor in collision tol, since the radius is a 
+    # maximum reached at a corner point, never at a side point, so this is
+    # always a conservative check
+    com_dist = norm(poly1.pos - poly2.pos)
+    if com_dist > max(poly1.radius, poly2.radius):
+        return False, None
 
-    rightmost_leftend = max(0, p11[0])
-    leftmost_rightend = min(p12[0],p22[0])
-
-    length_of_contact = min(p12[0],p22[0]) - max(0,p11[0])
-    assert(length_of_contact >= 0)
-
-    if length_of_contact < CONTACT_TOL:
-        length_of_contact = 0
-    return length_of_contact
-    
-    
+    best_side = None
+    best_score = np.inf
+    for i1,(p1p1,p1p2,s1) in enumerate(poly1.side_pos_iter()):
+        for i2,(p2p1,p2p2,s2) in enumerate(poly2.side_pos_iter()):
+            anglediff = abs(np.dot(s1,s2))/(norm(s1)*norm(s2))
+            if 1-anglediff < ANGLE_TOL:
+                
+                # I believe this always has to be minimized with p1p2 
+                # assuming coords entered consistently cw or ccw
+                # Lines should be in reverse orientation to each other
+                cross1 = p1p1-p2p1
+                score = min(abs(np.dot(p1p2 - p2p1, s2)), abs(np.dot(cross1, s2)))
+                if score < best_score:
+                    best_side = (i1,i2)
+                    best_score = score
+                    crosslen2 = norm(p2p2-p1p2)
+                    contact_length = abs(norm(cross1) - crosslen2)
+                    normal = np.array([p2p2[1] - p2p1[1], p2p1[0] - p2p2[0]])
+    if not best_side:
+        return 0,None
+    unit_normal = normal/norm(normal)
+    return contact_length, unit_normal
