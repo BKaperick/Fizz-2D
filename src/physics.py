@@ -103,16 +103,16 @@ class World:
             # each object in the world
             for obj in self.objs:
                 obj.forces = []
-                #TODO: incorporate normal force 
-#                for obj2 in self.objs:
-#                    if obj != obj2:
-#                        [length, normal] = side_contect(obj,obj2)
-#                        if length:
-#                            obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
-                for fobj in self.fixed_objs:
-                    (length, normal) = side_contact(obj,fobj)
-                    if length:
-                        obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
+#                #TODO: incorporate normal force 
+##                for obj2 in self.objs:
+##                    if obj != obj2:
+##                        [length, normal] = side_contect(obj,obj2)
+##                        if length:
+##                            obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
+#                for fobj in self.fixed_objs:
+#                    (length, normal) = side_contact(obj,fobj)
+#                    if length:
+#                        obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
                 obj.pre_update(obj.forces, gdf, dt)
 
             # check_collisions() compiles a list of collisions with information:
