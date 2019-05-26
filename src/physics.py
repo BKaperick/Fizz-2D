@@ -130,6 +130,10 @@ class World:
                 if obj1.is_fixed:
                     obj1,obj2 = obj2,obj1
                 
+                [side_length, left, right, normal] = side_contact(obj1,obj2)
+                if side_length:
+                   pass 
+                
                 # Reassemble normal vector with some added spacing so two 
                 # objects are definitely non-overlapping after collision 
                 # resolution
@@ -141,7 +145,8 @@ class World:
                 if flag == 1:
                     normal_vec *= -1
                     unit_normal_vec *= -1
-                
+
+
                 # obj1 is NEVER fixed, so this branch is for a collision with a 
                 # free object and a fixed object
                 #
@@ -745,7 +750,8 @@ def triangle_moment_of_inertia(p0,p1,p2):
 def side_contact(poly1, poly2):
     '''
     Returns (length,normal) giving length of "face-to-face" contact, and if so
-    a unit vector facing poly1 normal to the contact
+    left and right endpoints, and a unit vector facing poly1 normal to the 
+    contact.
     '''
     
     # first check if the polygons can possibly be in contact
@@ -754,7 +760,7 @@ def side_contact(poly1, poly2):
     # always a conservative check
     com_dist = norm(poly1.pos - poly2.pos)
     if com_dist > max(poly1.radius, poly2.radius):
-        return False, None
+        return 0, None, None, None
     best_side = None
     best_score = .01
     for i1,(p1p1,p1p2,s1) in enumerate(poly1.side_pos_iter()):
@@ -767,8 +773,6 @@ def side_contact(poly1, poly2):
                 # Lines should be in reverse orientation to each other
                 z = p1p1-p2p2
                 score = norm(np.cross(z/norm(z),s2/norm(s2)))
-                #cross2 = np.dot(p1p2-p2p1,s2)/(norm(s2)*norm(p1p2-p2p1))
-                #score = min(abs(np.dot(p1p2 - p2p1, s2)), abs(np.dot(cross1, s2))/(norm(cross1)*norm(s2)))
                 if score < best_score:
                     best_side = (i1,i2)
                     best_score = score
@@ -779,7 +783,22 @@ def side_contact(poly1, poly2):
                     
                     # Again, with CW assumption, this turns toward object 1
                     normal = np.array([p2p2[1] - p2p1[1], p2p1[0] - p2p2[0]])
+
+                    a,b,c,d = p1p1,p1p2,p2p1,p2p2
+                    if a[0] > b[0]:
+                        a,b = b,a
+                    if c[0] > d[0]:
+                        c,d = d,c
+                    if a[0] < c[0] and c[0] < b[0]:
+                        left = c
+                    else:
+                        left = a
+                    if a[0] < d[0] and d[0] < b[0]:
+                        right = d
+                    else:
+                        right = b
+    assert(abs(contact_length - norm(right - left)) / abs(contact_length) < EPSILON)
     if not best_side:
-        return 0,None
+        return 0,None, None, None
     unit_normal = -normal/norm(normal)
-    return contact_length, unit_normal
+    return contact_length, left, right, unit_normal
