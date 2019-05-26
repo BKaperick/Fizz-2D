@@ -17,10 +17,10 @@ DENSITY = .1
 EPSILON = 1e-12
 # 1 == perfectly elastic 
 # 0 == perfectly inelastic
-ELASTICITY = .50
+ELASTICITY = 1.0
 TIME_TOL = 1e-10
 COLLISION_TOL = 2
-TIME_DISC = .01
+TIME_DISC = .05
 VIBRATE_TOL = 1e-5
 
 ANGLE_TOL = 1e-4
@@ -53,10 +53,11 @@ class World:
 
     
     def init_obj(self, obj):
-        self.objs.append(obj)
-        #forces.append(self.global_force)
         if self.global_damping_force:
             obj.damping_force = True
+        # Only force initially acting is gravity
+        obj.forces.append(obj.mass*self.global_accel)
+        self.objs.append(obj)
 
     def init_fixed_obj(self, obj):
         self.fixed_objs.append(obj)
@@ -102,18 +103,20 @@ class World:
             # Do first pass of position, velocity and acceleration updates for 
             # each object in the world
             for obj in self.objs:
-                obj.forces = []
 #                #TODO: incorporate normal force 
-##                for obj2 in self.objs:
-##                    if obj != obj2:
-##                        [length, normal] = side_contect(obj,obj2)
-##                        if length:
-##                            obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
-#                for fobj in self.fixed_objs:
-#                    (length, normal) = side_contact(obj,fobj)
-#                    if length:
-#                        obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
-                obj.pre_update(obj.forces, gdf, dt)
+                for obj2 in self.fixed_objs:
+                    
+                    # cheap if obj2 not near obj1
+                    [length, normal] = side_contact(obj,obj2)
+
+                    if length:
+                        net_forces = sum(obj.forces)
+                        normal_force = -(1+ELASTICITY)*np.dot(net_forces,normal)*normal
+                        #print('normal: ',net_forces,normal_force,normal_force + net_forces)
+                        obj.forces.append(normal_force)
+                obj.pre_update(gdf, dt)
+                if len(obj.forces) > 1:
+                    obj.forces.pop()
 
             # check_collisions() compiles a list of collisions with information:
             #   (1,2) the two objects contained in the collision
@@ -131,111 +134,6 @@ class World:
                     print(dt,max_collision_overlap, self.objs[0].com.pos[1])
         if dt < TIME_TOL:
             print("Warning: time became too small while still in collision.  ")
-        while collisions:
-            for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
-                
-                # Makes things easier if the first object is never fixed
-                if obj1.is_fixed:
-                    obj1,obj2 = obj2,obj1
-                
-                # Reassemble normal vector with some added spacing so two 
-                # objects are definitely non-overlapping after collision 
-                # resolution
-                normal_vec = unit_normal_vec * (normal_vec_mag + EPSILON)
-                if verbosity:
-                    print("normal vec: ", normal_vec)
-                
-                # If flag, the normal vector needs to be flipped
-                if flag == 1:
-                    normal_vec *= -1
-                    unit_normal_vec *= -1
-                
-                # obj1 is NEVER fixed, so this branch is for a collision with a 
-                # free object and a fixed object
-                #
-                # 1. The free object updates its position by the normal vector
-                # 2. The free object updates its velocity by twice the (negated)
-                #    component of its velocity normal to the surface
-                #
-                #print(obj1.is_fixed, obj2.is_fixed)
-                if obj2.is_fixed:
-                    
-                    #Jpart = (obj1.mass*obj2.mass/(obj1.mass + obj2.mass))*(1+CR)
-                    #obj1.com.vel += (Jpart/obj1.mass + Jpart/obj2.mass)*(v2n - v1n)*unit_normal_vec
-                    for i in range(len(obj1.points)):
-                        obj1.points[i].pos += normal_vec
-
-                        ## This would work for inelastic collisions with others
-                        #obj1.points[i].vel += (Jpart/obj1.mass + Jpart/obj2.mass)*(unit_normal_vec)*(v2n - np.dot(obj1.points[i].vel,unit_normal_vec))
-                        
-                        vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
-                        obj1.points[i].vel -= (1+ELASTICITY)*vdotN*unit_normal_vec
-
-                    # TODO: why is this here?
-                    if norm(normal_vec) > VIBRATE_TOL:
-                        obj1.com.pos += normal_vec
-                    
-                    vdotN = np.dot(obj1.com.vel, unit_normal_vec)
-                    #if norm(vdotN) > VIBRATE_TOL:
-                    ##obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
-                    #J = obj1.mass*
-                    K0 = .5*obj1.mass*norm(obj1.com.vel)**2
-                    obj1.com.vel -= (1+ELASTICITY)*vdotN * unit_normal_vec
-                    
-                    # Update heat energy, dispersed equally to each object
-                    H = .5*obj1.mass*(1-ELASTICITY**2)*(vdotN**2)
-                    K1 = .5*obj1.mass*norm(obj1.com.vel)**2
-                    obj1.heat += H/2
-                    obj2.heat += H/2
-                    self.heat += H
-
-                    obj1.finish_update()
-                    obj2.finish_update()
-
-                # Only other possible case is that both objects are free
-                else:
-                    v1 = obj1.com.vel
-                    mtotal = obj1.mass + obj2.mass
-                    mprop1 = obj1.mass / mtotal 
-                    mprop2 = 1-mprop1 
-                    obj1.com.pos += mprop1 * (normal_vec)
-                    vn1 = np.dot(obj1.com.vel,unit_normal_vec)
-                    vn2 = np.dot(obj2.com.vel,unit_normal_vec)
-                    v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
-                    if verbosity:
-                        v0a = np.copy(obj1.com.vel)
-                        v0b = np.copy(obj2.com.vel)
-                        print("inits", v0a,v0b)
-                        K0a = .5*obj1.mass*norm(obj1.com.vel)**2
-                        K0b = .5*obj2.mass*norm(obj2.com.vel)**2
-                        print('K0a= ', K0a)
-                        print('K0b= ', K0b)
-                        #print('mbefore:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
-                    obj1.com.vel += (v1_update - np.dot(obj1.com.vel,unit_normal_vec))*unit_normal_vec
-                    for point in obj1.points:
-                        point.pos += mprop1 * (normal_vec)
-                        point.vel += (v1_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
-                        
-                    obj1.finish_update()
-                    
-                    obj2.com.pos -= mprop2 * normal_vec
-                    v2_update = 2*mprop1*vn1 + (mprop2 - mprop1)*vn2
-                    obj2.com.vel += (v2_update - np.dot(obj2.com.vel,unit_normal_vec))*unit_normal_vec
-                    for point in obj2.points:
-                        point.pos -= mprop2 * (normal_vec)
-                        point.vel += (v2_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
-                    obj2.finish_update()
-                    if verbosity:
-                        print("inits", v0a,v0b)
-                        print("a_update=",vn2, v1_update)
-                        print("b_update=",vn1, v2_update)
-                        print("va1 =", obj1.com.vel, v0a+vn1)
-                        print("vb1 =", obj2.com.vel, v0b+vn2)
-                        print('K1a=',K0a + .5*obj1.mass*(vn1**2 - vn2**2), .5*obj1.mass*norm(obj1.com.vel)**2)
-                        print('K1b=',K0b + .5*obj2.mass*(vn2**2 - vn1**2), .5*obj2.mass*norm(obj2.com.vel)**2)
-                        #print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
-
-            collisions = self.check_collisions()
 
         # Do second (final) pass for each object in the world
         for obj in self.objs:
@@ -244,9 +142,9 @@ class World:
         
         # Update the remainder of the time step
         # ensures each frame transition is consistent time width
-        for obj in self.objs:
-            obj.pre_update([], gdf, self.time_disc - dt)
-            obj.finish_update()
+#        for obj in self.objs:
+#            obj.pre_update(gdf, self.time_disc - dt)
+#            obj.finish_update()
         
         # Advance time
         self.state += self.time_disc
@@ -263,6 +161,13 @@ class World:
                 if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
+                
+                # Don't even check collisions if the two objects are not close 
+                # to each other
+                com_dist = norm(obj.pos - other_obj.pos)
+                if com_dist > max(obj.radius, other_obj.radius):
+                    continue
+
                 if verbosity >= 2:
                     print([p.pos for p in obj.points])
                     print([p.pos for p in other_obj.points])
@@ -313,6 +218,7 @@ class Obj:
         self.new_acc = 0.0
         
         self.world = world
+        self.forces = []
         if world:
             world.init_obj(self)
 
@@ -339,7 +245,7 @@ class Obj:
         for p1,p2 in zip(self.points, self.points[1:]+[self.points[0]]):
             yield p1.pos,p2.pos,p2.pos-p1.pos
 
-    def pre_update(self, force, damping_force, dt):
+    def pre_update(self, damping_force, dt):
         '''
         All points in the object are updated one step in accordance with the 
         calculations done on the center of mass point.
@@ -360,8 +266,8 @@ class Obj:
         self.com.oldacc = np.copy(self.com.acc)
         
         # Use time-integrator of choice to find new x,v,a
-        self.update_x, self.update_v, self.new_acc = self.com.move(force, dt)
-
+        self.update_x, self.update_v, self.new_acc = self.com.move(self.forces, dt)
+        
         for point in self.points:
 
             # Retain copy of previous step
@@ -408,6 +314,7 @@ class Point:
                 mass = 1, 
                 pos = np.array([0.0,0.0]),
                 speed = np.array([0.0,0.0]),
+#                forces = np.array([0.0,0.0])
                 ):
         
         self.name = "point"
@@ -419,9 +326,11 @@ class Point:
         self.vel = speed
         self.oldacc = np.array([0.0,0.0])
         self.acc = np.array([0.0,0.0])
+#        self.forces = np.array(mass*world.global_accel)
 
         self.world = world
         self.mass = mass
+
 
 
     def move(self, forces, dt):
@@ -438,7 +347,7 @@ class Point:
         self.pos += update_x
         
         # Update acceleration
-        new_acc = (sum(forces) / self.mass) + self.world.global_accel
+        new_acc = (sum(forces) / self.mass)
         self.acc = new_acc
         
         # Update velocity
@@ -446,6 +355,10 @@ class Point:
         self.vel = v_avg + (self.acc * halfdt)
         if verbosity > 1:
             print('update', update_x)
+        if verbosity:
+            print('updatex:', update_x)
+            print('updatev:', update_v)
+            print('new acc:', new_acc)
         return update_x, update_v, new_acc
 
 
@@ -503,7 +416,7 @@ class Polygon(Obj):
         else:
             self.moment_of_inertia()
             self.mass = self.area*density
-            if verbosity:
+            if verbosity>1:
                 print('mass:',self.mass)
                 print('height:',self.pos[1])
                 print('potent:',self.p_energy())
@@ -511,7 +424,7 @@ class Polygon(Obj):
         # second pass to fix masses  for unfixed polygons
         for point in self.points:
             point.mass = self.mass
-    
+        
 #    def area(self):
 #        if self.area:
 #            return self.area
@@ -707,7 +620,7 @@ def polypoly_collision(poly1, poly2):
     
 
 def triangle_area(pA,pB,pC):
-    if verbosity:
+    if verbosity>1:
         print(pA,pB,pC)
     area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
     return area
@@ -736,9 +649,10 @@ def triangle_moment_of_inertia(p0,p1,p2):
 
 def side_contact(poly1, poly2):
     '''
-    returns a boolean determining whether two objects are in "face-to-face" contact.
+    Returns (length,normal) giving length of "face-to-face" contact, and if so
+    a unit vector facing poly1 normal to the contact
     '''
-
+    
     # first check if the polygons can possibly be in contact
     # note: we don't need to factor in collision tol, since the radius is a 
     # maximum reached at a corner point, never at a side point, so this is
@@ -746,26 +660,31 @@ def side_contact(poly1, poly2):
     com_dist = norm(poly1.pos - poly2.pos)
     if com_dist > max(poly1.radius, poly2.radius):
         return False, None
-
     best_side = None
-    best_score = np.inf
+    best_score = .01
     for i1,(p1p1,p1p2,s1) in enumerate(poly1.side_pos_iter()):
         for i2,(p2p1,p2p2,s2) in enumerate(poly2.side_pos_iter()):
             anglediff = abs(np.dot(s1,s2))/(norm(s1)*norm(s2))
-            if 1-anglediff < ANGLE_TOL:
+            if  1-anglediff < ANGLE_TOL:
                 
                 # I believe this always has to be minimized with p1p2 
                 # assuming coords entered consistently cw or ccw
                 # Lines should be in reverse orientation to each other
-                cross1 = p1p1-p2p1
-                score = min(abs(np.dot(p1p2 - p2p1, s2)), abs(np.dot(cross1, s2)))
+                z = p1p1-p2p2
+                score = norm(np.cross(z/norm(z),s2/norm(s2)))
+                #cross2 = np.dot(p1p2-p2p1,s2)/(norm(s2)*norm(p1p2-p2p1))
+                #score = min(abs(np.dot(p1p2 - p2p1, s2)), abs(np.dot(cross1, s2))/(norm(cross1)*norm(s2)))
                 if score < best_score:
                     best_side = (i1,i2)
                     best_score = score
+                    crosslen1 = norm(p1p1-p2p1)
                     crosslen2 = norm(p2p2-p1p2)
-                    contact_length = abs(norm(cross1) - crosslen2)
+                    minlen = min(norm(s1),norm(s2))
+                    contact_length = min(minlen, crosslen1, crosslen2)
+                    
+                    # Again, with CW assumption, this turns toward object 1
                     normal = np.array([p2p2[1] - p2p1[1], p2p1[0] - p2p2[0]])
     if not best_side:
         return 0,None
-    unit_normal = normal/norm(normal)
+    unit_normal = -normal/norm(normal)
     return contact_length, unit_normal

@@ -1,0 +1,47 @@
+500,600
+# Rectangle on leftmost edge of screen
+fixedpolygon
+sides,4
+point,0,0
+point,0,600
+point,50,600
+point,50,0
+# Rectangle on rightmost edge of screen
+fixedpolygon
+sides,4
+point,450,0
+point,450,600
+point,500,600
+point,500,0
+# Rectangle dividing two components of screen
+fixedpolygon
+sides,4
+point,449,325
+point,51,325
+point,51,275
+point,449,275
+# Rectangle on bottom edge of screen
+fixedpolygon
+sides,4
+point,51,0
+point,51,50
+point,449,50
+point,449,0
+# Rectangle on top edge of screen
+fixedpolygon
+sides,4
+point,51,551
+point,51,600
+point,449,600
+point,449,551
+# Isolated Object
+polygon
+density,1
+sides,4
+velocity,100,350
+point,225,100
+point,225,150
+point,275,150
+point,275,100
+
+PARAM ELASTICITY .9
