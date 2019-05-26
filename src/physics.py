@@ -17,10 +17,10 @@ DENSITY = .1
 EPSILON = 1e-12
 # 1 == perfectly elastic 
 # 0 == perfectly inelastic
-ELASTICITY = .50
+ELASTICITY = 1.0
 TIME_TOL = 1e-10
 COLLISION_TOL = 2
-TIME_DISC = .01
+TIME_DISC = .05
 VIBRATE_TOL = 1e-5
 
 ANGLE_TOL = 1e-4
@@ -53,10 +53,11 @@ class World:
 
     
     def init_obj(self, obj):
-        self.objs.append(obj)
-        #forces.append(self.global_force)
         if self.global_damping_force:
             obj.damping_force = True
+        # Only force initially acting is gravity
+        obj.forces.append(obj.mass*self.global_accel)
+        self.objs.append(obj)
 
     def init_fixed_obj(self, obj):
         self.fixed_objs.append(obj)
@@ -70,7 +71,7 @@ class World:
         E[3] = self.heat    
         E[0] = sum(E[1:4])
         return E
-
+    
     def update(self):
         '''
         This function is called once each time step.  All position and velocity
@@ -103,6 +104,16 @@ class World:
             # each object in the world
             for obj in self.objs:
                 obj.forces = []
+#                #TODO: incorporate normal force 
+##                for obj2 in self.objs:
+##                    if obj != obj2:
+##                        [length, normal] = side_contect(obj,obj2)
+##                        if length:
+##                            obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
+#                for fobj in self.fixed_objs:
+#                    (length, normal) = side_contact(obj,fobj)
+#                    if length:
+#                        obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
                 obj.pre_update(obj.forces, gdf, dt)
 
             # check_collisions() compiles a list of collisions with information:
@@ -241,6 +252,7 @@ class World:
         # Advance time
         self.state += self.time_disc
 
+
     def check_collisions(self):
         '''
         Iterates through each pair of objects in the world, and determines if 
@@ -253,6 +265,13 @@ class World:
                 if o.name == "polygon" or o.name == "fixedpolygon"]
         for i,obj in enumerate(objects):
             for other_obj in objects[i+1:]:
+                
+                # Don't even check collisions if the two objects are not close 
+                # to each other
+                com_dist = norm(obj.pos - other_obj.pos)
+                if com_dist > max(obj.radius, other_obj.radius):
+                    continue
+
                 if verbosity >= 2:
                     print([p.pos for p in obj.points])
                     print([p.pos for p in other_obj.points])
@@ -303,6 +322,7 @@ class Obj:
         self.new_acc = 0.0
         
         self.world = world
+        self.forces = []
         if world:
             world.init_obj(self)
 
@@ -329,7 +349,7 @@ class Obj:
         for p1,p2 in zip(self.points, self.points[1:]+[self.points[0]]):
             yield p1.pos,p2.pos,p2.pos-p1.pos
 
-    def pre_update(self, force, damping_force, dt):
+    def pre_update(self, damping_force, dt):
         '''
         All points in the object are updated one step in accordance with the 
         calculations done on the center of mass point.
@@ -350,8 +370,8 @@ class Obj:
         self.com.oldacc = np.copy(self.com.acc)
         
         # Use time-integrator of choice to find new x,v,a
-        self.update_x, self.update_v, self.new_acc = self.com.move(force, dt)
-
+        self.update_x, self.update_v, self.new_acc = self.com.move(self.forces, dt)
+        
         for point in self.points:
 
             # Retain copy of previous step
@@ -398,6 +418,7 @@ class Point:
                 mass = 1, 
                 pos = np.array([0.0,0.0]),
                 speed = np.array([0.0,0.0]),
+#                forces = np.array([0.0,0.0])
                 ):
         
         self.name = "point"
@@ -409,9 +430,11 @@ class Point:
         self.vel = speed
         self.oldacc = np.array([0.0,0.0])
         self.acc = np.array([0.0,0.0])
+#        self.forces = np.array(mass*world.global_accel)
 
         self.world = world
         self.mass = mass
+
 
 
     def move(self, forces, dt):
@@ -428,7 +451,7 @@ class Point:
         self.pos += update_x
         
         # Update acceleration
-        new_acc = (sum(forces) / self.mass) + self.world.global_accel
+        new_acc = (sum(forces) / self.mass)
         self.acc = new_acc
         
         # Update velocity
@@ -436,6 +459,10 @@ class Point:
         self.vel = v_avg + (self.acc * halfdt)
         if verbosity > 1:
             print('update', update_x)
+        if verbosity:
+            print('updatex:', update_x)
+            print('updatev:', update_v)
+            print('new acc:', new_acc)
         return update_x, update_v, new_acc
 
 
@@ -493,7 +520,7 @@ class Polygon(Obj):
         else:
             self.moment_of_inertia()
             self.mass = self.area*density
-            if verbosity:
+            if verbosity>1:
                 print('mass:',self.mass)
                 print('height:',self.pos[1])
                 print('potent:',self.p_energy())
@@ -501,7 +528,7 @@ class Polygon(Obj):
         # second pass to fix masses  for unfixed polygons
         for point in self.points:
             point.mass = self.mass
-    
+        
 #    def area(self):
 #        if self.area:
 #            return self.area
@@ -697,7 +724,7 @@ def polypoly_collision(poly1, poly2):
     
 
 def triangle_area(pA,pB,pC):
-    if verbosity:
+    if verbosity>1:
         print(pA,pB,pC)
     area = .5 * abs(pA[0]*pB[1] + pB[0]*pC[1] + pC[0]*pA[1] - pA[0]*pC[1] - pC[0]*pB[1] - pB[0]*pA[1])
     return area
@@ -726,9 +753,10 @@ def triangle_moment_of_inertia(p0,p1,p2):
 
 def side_contact(poly1, poly2):
     '''
-    returns a boolean determining whether two objects are in "face-to-face" contact.
+    Returns (length,normal) giving length of "face-to-face" contact, and if so
+    a unit vector facing poly1 normal to the contact
     '''
-
+    
     # first check if the polygons can possibly be in contact
     # note: we don't need to factor in collision tol, since the radius is a 
     # maximum reached at a corner point, never at a side point, so this is
@@ -736,26 +764,31 @@ def side_contact(poly1, poly2):
     com_dist = norm(poly1.pos - poly2.pos)
     if com_dist > max(poly1.radius, poly2.radius):
         return False, None
-
     best_side = None
-    best_score = np.inf
+    best_score = .01
     for i1,(p1p1,p1p2,s1) in enumerate(poly1.side_pos_iter()):
         for i2,(p2p1,p2p2,s2) in enumerate(poly2.side_pos_iter()):
             anglediff = abs(np.dot(s1,s2))/(norm(s1)*norm(s2))
-            if 1-anglediff < ANGLE_TOL:
+            if  1-anglediff < ANGLE_TOL:
                 
                 # I believe this always has to be minimized with p1p2 
                 # assuming coords entered consistently cw or ccw
                 # Lines should be in reverse orientation to each other
-                cross1 = p1p1-p2p1
-                score = min(abs(np.dot(p1p2 - p2p1, s2)), abs(np.dot(cross1, s2)))
+                z = p1p1-p2p2
+                score = norm(np.cross(z/norm(z),s2/norm(s2)))
+                #cross2 = np.dot(p1p2-p2p1,s2)/(norm(s2)*norm(p1p2-p2p1))
+                #score = min(abs(np.dot(p1p2 - p2p1, s2)), abs(np.dot(cross1, s2))/(norm(cross1)*norm(s2)))
                 if score < best_score:
                     best_side = (i1,i2)
                     best_score = score
+                    crosslen1 = norm(p1p1-p2p1)
                     crosslen2 = norm(p2p2-p1p2)
-                    contact_length = abs(norm(cross1) - crosslen2)
+                    minlen = min(norm(s1),norm(s2))
+                    contact_length = min(minlen, crosslen1, crosslen2)
+                    
+                    # Again, with CW assumption, this turns toward object 1
                     normal = np.array([p2p2[1] - p2p1[1], p2p1[0] - p2p2[0]])
     if not best_side:
         return 0,None
-    unit_normal = normal/norm(normal)
+    unit_normal = -normal/norm(normal)
     return contact_length, unit_normal
