@@ -38,7 +38,7 @@ point,449,551
 polygon
 density,1
 sides,4
-velocity,100,350
+velocity,0,0
 point,225,100
 point,225,150
 point,275,150

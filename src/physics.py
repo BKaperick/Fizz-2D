@@ -13,14 +13,15 @@ import config
 
 # World constants
 GRAVITY = np.array([0.0,9.8])
+TIME_DISC = .1
+
 DENSITY = .1
 EPSILON = 1e-12
 # 1 == perfectly elastic 
 # 0 == perfectly inelastic
 ELASTICITY = 1.0
 TIME_TOL = 1e-10
-COLLISION_TOL = 2
-TIME_DISC = .05
+COLLISION_TOL = .1
 VIBRATE_TOL = 1e-5
 
 ANGLE_TOL = 1e-4
@@ -103,18 +104,8 @@ class World:
             # Do first pass of position, velocity and acceleration updates for 
             # each object in the world
             for obj in self.objs:
-                obj.forces = []
-#                #TODO: incorporate normal force 
-##                for obj2 in self.objs:
-##                    if obj != obj2:
-##                        [length, normal] = side_contect(obj,obj2)
-##                        if length:
-##                            obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
-#                for fobj in self.fixed_objs:
-#                    (length, normal) = side_contact(obj,fobj)
-#                    if length:
-#                        obj.forces.append(-abs(np.dot(GRAVITY,normal)*GRAVITY[1]))
-                obj.pre_update(obj.forces, gdf, dt)
+                #obj.forces = []
+                obj.pre_update(gdf, dt)
 
             # check_collisions() compiles a list of collisions with information:
             #   (1,2) the two objects contained in the collision
@@ -246,7 +237,7 @@ class World:
         # Update the remainder of the time step
         # ensures each frame transition is consistent time width
         for obj in self.objs:
-            obj.pre_update([], gdf, self.time_disc - dt)
+            obj.pre_update(gdf, self.time_disc - dt)
             obj.finish_update()
         
         # Advance time
