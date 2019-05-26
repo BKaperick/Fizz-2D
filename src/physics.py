@@ -316,7 +316,7 @@ class Obj:
         self.vel = speed
         self.acc = np.array([0.0,0.0])
         self.rotpos = rotation_angle
-        self.rotvel = rotation_speed
+        self.rotvel = 1.0
         self.rotacc = 0.0
 
         self.update_x = 0.0
@@ -380,13 +380,12 @@ class Obj:
         self.com.oldrotpos = np.copy(self.com.rotpos)
         self.com.oldrotpos = np.copy(self.com.rotvel)
         self.com.oldrotacc = np.copy(self.com.rotacc)
-        
+        print(self.com.rotvel)
         # Use time-integrator of choice to find new x,v,a
         self.update_x, self.update_v, self.new_acc = self.com.move(self.forces, dt)
         
         # Use time-integrator of choice to find new x,v,a
         self.update_rotx, self.update_rotv, self.new_rotacc = self.com.rotate(self.torques, dt)
-        
         for point in self.points:
 
             # Retain copy of previous step
@@ -401,7 +400,8 @@ class Obj:
             
             # update point x,v,a values
             point.update_with_object(self, self.update_x, self.update_v, self.new_acc, self.update_rotx, self.update_rotv, self.new_rotacc)
-            
+            print('\t',point.rotvel,self.update_rotv)
+
 
     def reverse_update(self):
         '''
@@ -427,6 +427,10 @@ class Obj:
         self.pos = np.array(self.com.pos, copy=True)
         self.vel = np.array(self.com.vel, copy=True)
         self.acc = np.array(self.com.acc, copy=True)
+        
+        self.rotpos = np.array(self.com.rotpos, copy=True)
+        self.rotvel = np.array(self.com.rotvel, copy=True)
+        self.rotacc = np.array(self.com.rotacc, copy=True)
     
     def __str__(self):
         return str(self)
@@ -501,6 +505,7 @@ class Point:
         v_avg = self.rotvel + update_v
         
         # Update position
+        print('vavg:',v_avg,self.rotvel)
         update_x = v_avg * dt
         self.rotpos += update_x
         
@@ -509,7 +514,7 @@ class Point:
         self.rotacc = new_acc
         
         # Update velocity
-        update_v += self.acc * halfdt
+        update_v += self.rotacc * halfdt
         self.rotvel = v_avg + (self.rotacc * halfdt)
         if verbosity > 1:
             print('update', update_x)
@@ -547,7 +552,9 @@ class Point:
         
         radius = norm(self.pos - obj.com.pos)
 
-        self.pos += update_x + 2 * radius * np.sin(update_rotx/2)
+        self.pos += update_x #+ 2 * radius * np.sin(update_rotx/2)
+        self.pos[0] += radius*(np.sin(update_rotx+self.rotpos) - np.sin(self.rotpos))
+        self.pos[1] += radius*(np.cos(update_rotx+self.rotpos) - np.cos(self.rotpos))
         self.vel += update_v + radius*update_rotv
         self.acc = np.array(new_acc, copy=True) + radius*new_rotacc
         
@@ -579,6 +586,8 @@ class Polygon(Obj):
             self.com.moment_of_inertia = np.inf
             self.mass = np.inf
         else:
+            self.rotvel = 1.0
+            self.com.rotvel = 1.0
             self.com.moment_of_inertia = self.moment_of_inertia()
             self.mass = self.area*density
             if verbosity>1:
@@ -592,6 +601,7 @@ class Polygon(Obj):
             # TODO: this is a kind of hacky way to differentiate 
             # fixed and unfixed polygons
             if density != np.inf:
+                point.rotvel = 1.0
                 point.moment_of_inertia = self.moment_of_inertia()
             else:
                 point.moment_of_inertia = np.inf
@@ -870,7 +880,7 @@ def side_contact(poly1, poly2):
                         right = d
                     else:
                         right = b
-    assert(abs(contact_length - norm(right - left)) / abs(contact_length) < EPSILON)
+    #assert(abs(contact_length - norm(right - left)) / abs(contact_length) < EPSILON)
     if not best_side:
         return 0,None, None, None
     unit_normal = -normal/norm(normal)
