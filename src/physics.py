@@ -132,7 +132,10 @@ class World:
                 
                 [side_length, left, right, normal] = side_contact(obj1,obj2)
                 if side_length:
-                   pass 
+                    # Check if torque is induced 
+                    # (TODO: this is not gravity-direction neutral)
+                    if obj1.com.pos[0] < left[0] or obj1.com.pos[0] > right[0]:
+                        pass # induce torque
                 
                 # Reassemble normal vector with some added spacing so two 
                 # objects are definitely non-overlapping after collision 
@@ -293,6 +296,8 @@ class Obj:
     def __init__(self, points = [], world = None, mass = 1, density = 1, 
                 pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
                 rotation_angle = 0.0, rotation_speed = 0.0):
+        
+        self.cached_I = None
         self.mass = mass
         self.density = density
         self.points = points
@@ -310,15 +315,21 @@ class Obj:
         self.pos = pos
         self.vel = speed
         self.acc = np.array([0.0,0.0])
-        self.rot_ang = rotation_angle
-        self.rot_spd = rotation_speed
+        self.rotpos = rotation_angle
+        self.rotvel = rotation_speed
+        self.rotacc = 0.0
 
         self.update_x = 0.0
         self.update_v = 0.0
         self.new_acc = 0.0
         
+        self.update_rotx = 0.0
+        self.update_rotv = 0.0
+        self.new_rotacc = 0.0
+        
         self.world = world
         self.forces = []
+        self.torques = []
         if world:
             world.init_obj(self)
 
@@ -365,8 +376,16 @@ class Obj:
         self.com.oldvel = np.copy(self.com.vel)
         self.com.oldacc = np.copy(self.com.acc)
         
+        # Retain copy of previous step
+        self.com.oldrotpos = np.copy(self.com.rotpos)
+        self.com.oldrotpos = np.copy(self.com.rotvel)
+        self.com.oldrotacc = np.copy(self.com.rotacc)
+        
         # Use time-integrator of choice to find new x,v,a
         self.update_x, self.update_v, self.new_acc = self.com.move(self.forces, dt)
+        
+        # Use time-integrator of choice to find new x,v,a
+        self.update_rotx, self.update_rotv, self.new_rotacc = self.com.rotate(self.torques, dt)
         
         for point in self.points:
 
@@ -375,8 +394,14 @@ class Obj:
             point.oldvel = np.copy(point.vel)
             point.oldacc = np.copy(point.acc)
             
+            # Retain copy of previous step
+            point.oldrotpos = np.copy(point.rotpos)
+            point.oldrotvel = np.copy(point.rotvel)
+            point.oldrotacc = np.copy(point.rotacc)
+            
             # update point x,v,a values
-            point.update_with_object(self, self.update_x, self.update_v, self.new_acc)
+            point.update_with_object(self, self.update_x, self.update_v, self.new_acc, self.update_rotx, self.update_rotv, self.new_rotacc)
+            
 
     def reverse_update(self):
         '''
@@ -415,12 +440,17 @@ class Point:
                 pos = np.array([0.0,0.0]),
                 speed = np.array([0.0,0.0]),
 #                forces = np.array([0.0,0.0])
+                I = 0.0
                 ):
         
         self.name = "point"
 
         self.oldpos = np.array(pos, dtype=float)
         self.pos = np.array(pos, dtype=float)
+        
+        self.rotpos = 0.0
+        self.rotvel = 0.0
+        self.rotacc = 0.0
 
         self.oldvel = speed
         self.vel = speed
@@ -430,7 +460,7 @@ class Point:
 
         self.world = world
         self.mass = mass
-
+#        self.moment_of_inertia = I
 
 
     def move(self, forces, dt):
@@ -460,6 +490,34 @@ class Point:
             print('updatev:', update_v)
             print('new acc:', new_acc)
         return update_x, update_v, new_acc
+    
+    def rotate(self, torques, dt):
+        '''
+        Velocity Verlet Algorithm to update x,v,a with global error of order 2.
+        '''
+
+        halfdt = .5*dt
+        update_v = self.rotacc * halfdt
+        v_avg = self.rotvel + update_v
+        
+        # Update position
+        update_x = v_avg * dt
+        self.rotpos += update_x
+        
+        # Update acceleration
+        new_acc = (sum(torques) / self.moment_of_inertia)
+        self.rotacc = new_acc
+        
+        # Update velocity
+        update_v += self.acc * halfdt
+        self.rotvel = v_avg + (self.rotacc * halfdt)
+        if verbosity > 1:
+            print('update', update_x)
+        if verbosity:
+            print('updatex:', update_x)
+            print('updatev:', update_v)
+            print('new acc:', new_acc)
+        return update_x, update_v, new_acc
 
 
     def linear_damping_move(self, forces, dt):
@@ -477,7 +535,8 @@ class Point:
 
         return update_x, update_v, new_acc
     
-    def update_with_object(self, obj, update_x, update_v, new_acc):
+    def update_with_object(self, obj, update_x, update_v, new_acc,
+                                      update_rotx,update_rotv,new_rotacc):
         '''
         Eventually this update will incorporate the current rotation parameters of the object
         The update values are the updates applied to the object's center of mass.  With rotation,
@@ -485,10 +544,16 @@ class Point:
         '''
         if verbosity > 1:
             print(update_x, update_v, new_acc)
+        
+        radius = norm(self.pos - obj.com.pos)
 
-        self.pos += update_x
-        self.vel += update_v
-        self.acc = np.array(new_acc, copy=True)
+        self.pos += update_x + 2 * radius * np.sin(update_rotx/2)
+        self.vel += update_v + radius*update_rotv
+        self.acc = np.array(new_acc, copy=True) + radius*new_rotacc
+        
+        self.rotpos += update_rotx
+        self.rotvel += update_rotv
+        self.rotacc = np.array(new_rotacc, copy=True)
 
         com = obj.com
 
@@ -510,11 +575,11 @@ class Polygon(Obj):
         self.pos = self.com.pos
         self.vel = self.com.vel
 
-        self.cached_I = None
         if density == np.inf:
+            self.com.moment_of_inertia = np.inf
             self.mass = np.inf
         else:
-            self.moment_of_inertia()
+            self.com.moment_of_inertia = self.moment_of_inertia()
             self.mass = self.area*density
             if verbosity>1:
                 print('mass:',self.mass)
@@ -524,7 +589,13 @@ class Polygon(Obj):
         # second pass to fix masses  for unfixed polygons
         for point in self.points:
             point.mass = self.mass
-        
+            # TODO: this is a kind of hacky way to differentiate 
+            # fixed and unfixed polygons
+            if density != np.inf:
+                point.moment_of_inertia = self.moment_of_inertia()
+            else:
+                point.moment_of_inertia = np.inf
+
 #    def area(self):
 #        if self.area:
 #            return self.area
@@ -641,7 +712,9 @@ class FixedPolygon(Polygon):
         if world:
             world.init_fixed_obj(self)
         self.is_fixed = True
-        
+
+def moment_of_inertia(self):
+    return np.inf
 
 def polypoly_collision(poly1, poly2):
     '''
