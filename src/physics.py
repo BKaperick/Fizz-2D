@@ -85,7 +85,7 @@ class World:
             gdf = []
         else:
             gdf = [self.global_damping_force]
-        
+    
         dt = self.time_disc
         max_collision_overlap = COLLISION_TOL + 1
         first_iter = True
@@ -337,6 +337,26 @@ class Obj:
         
         self.heat = 0.0
 
+    def rotate(self, angle):
+        '''
+        Rotate Object angle radians
+        '''
+        print('rotating',self.com)
+        for point in self.points:
+            print('prp:',point.rotpos)
+            print(point,end=' -> ')
+            radius = point.pos - self.com.pos
+            current_cos = radius[1]/norm(radius)
+            th = point.rotpos + angle
+            current_sin = radius[0]/norm(radius)
+            print('({0},{1},{2})'.format(point.rotpos,angle,th),end='')
+            point.pos[0] = norm(radius)*np.cos(th) + self.com.pos[0]
+            point.pos[1] = norm(radius)*np.sin(th) + self.com.pos[1]
+            point.rotpos += angle
+            print(point)
+        self.rotpos += angle
+        self.com.rotpos += angle
+
     def momentum(self, direction):
         return self.mass * np.dot(self.com.vel, direction)/norm(direction)
     
@@ -380,12 +400,12 @@ class Obj:
         self.com.oldrotpos = np.copy(self.com.rotpos)
         self.com.oldrotpos = np.copy(self.com.rotvel)
         self.com.oldrotacc = np.copy(self.com.rotacc)
-        print(self.com.rotvel)
+        #print(self.com.rotvel)
         # Use time-integrator of choice to find new x,v,a
         self.update_x, self.update_v, self.new_acc = self.com.move(self.forces, dt)
         
         # Use time-integrator of choice to find new x,v,a
-        self.update_rotx, self.update_rotv, self.new_rotacc = self.com.rotate(self.torques, dt)
+        self.update_rotx, self.update_rotv, self.new_rotacc = self.com.move_angular(self.torques, dt)
         for point in self.points:
 
             # Retain copy of previous step
@@ -400,7 +420,7 @@ class Obj:
             
             # update point x,v,a values
             point.update_with_object(self, self.update_x, self.update_v, self.new_acc, self.update_rotx, self.update_rotv, self.new_rotacc)
-            print('\t',point.rotvel,self.update_rotv)
+            #print('\t',point.rotvel,self.update_rotv)
 
 
     def reverse_update(self):
@@ -495,7 +515,7 @@ class Point:
             print('new acc:', new_acc)
         return update_x, update_v, new_acc
     
-    def rotate(self, torques, dt):
+    def move_angular(self, torques, dt):
         '''
         Velocity Verlet Algorithm to update x,v,a with global error of order 2.
         '''
@@ -505,9 +525,8 @@ class Point:
         v_avg = self.rotvel + update_v
         
         # Update position
-        print('vavg:',v_avg,self.rotvel)
         update_x = v_avg * dt
-        self.rotpos += update_x
+        self.rotpos = update_x
         
         # Update acceleration
         new_acc = (sum(torques) / self.moment_of_inertia)
@@ -551,8 +570,7 @@ class Point:
             print(update_x, update_v, new_acc)
         
         radius = norm(self.pos - obj.com.pos)
-
-        self.pos += update_x #+ 2 * radius * np.sin(update_rotx/2)
+        self.pos += update_x
         self.pos[0] += radius*(np.sin(update_rotx+self.rotpos) - np.sin(self.rotpos))
         self.pos[1] += radius*(np.cos(update_rotx+self.rotpos) - np.cos(self.rotpos))
         self.vel += update_v + radius*update_rotv
@@ -586,8 +604,8 @@ class Polygon(Obj):
             self.com.moment_of_inertia = np.inf
             self.mass = np.inf
         else:
-            self.rotvel = 1.0
-            self.com.rotvel = 1.0
+            self.rotvel = 0.0
+            self.com.rotvel = 0.0
             self.com.moment_of_inertia = self.moment_of_inertia()
             self.mass = self.area*density
             if verbosity>1:
@@ -597,11 +615,16 @@ class Polygon(Obj):
         
         # second pass to fix masses  for unfixed polygons
         for point in self.points:
+            point.radius = point.pos - self.com.pos
+            point.rotpos = np.arccos(point.radius[0]/norm(point.radius))
+            if point.radius[1] > 0:
+                point.rotpos = 2*np.pi - point.rotpos
             point.mass = self.mass
             # TODO: this is a kind of hacky way to differentiate 
             # fixed and unfixed polygons
+            print(density)
             if density != np.inf:
-                point.rotvel = 1.0
+                point.rotvel = 0.0
                 point.moment_of_inertia = self.moment_of_inertia()
             else:
                 point.moment_of_inertia = np.inf
