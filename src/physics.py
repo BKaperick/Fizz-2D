@@ -607,7 +607,7 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = .0):
+    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = 5.0):
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
