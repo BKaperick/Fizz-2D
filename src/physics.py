@@ -105,6 +105,7 @@ class World:
             # each object in the world
             for obj in self.objs:
                 #obj.forces = []
+                print('rvel:',obj.rotvel)
                 obj.pre_update(gdf, dt)
 
             # check_collisions() compiles a list of collisions with information:
@@ -123,7 +124,9 @@ class World:
                     print(dt,max_collision_overlap, self.objs[0].com.pos[1])
         if dt < TIME_TOL:
             print("Warning: time became too small while still in collision.  ")
+        tries = 0
         while collisions:
+           
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
                 
                 # Makes things easier if the first object is never fixed
@@ -236,6 +239,10 @@ class World:
                         #print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
 
             collisions = self.check_collisions()
+            tries += 1
+            print(tries)
+            if tries > 10:
+                break
 
         # Do second (final) pass for each object in the world
         for obj in self.objs:
@@ -295,7 +302,7 @@ class World:
 class Obj:
     def __init__(self, points = [], world = None, mass = 1, density = 1, 
                 pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
-                rotation_angle = 0.0, rotation_speed = 0.0):
+                rotation_speed = .10):
         
         self.cached_I = None
         self.mass = mass
@@ -308,6 +315,7 @@ class Obj:
                 pos = com_pos, 
                 mass = mass,
                 speed = speed,
+                rotvel = rotation_speed
                 )
         self.radius = max([norm(pt.pos - com_pos) for pt in points])
         
@@ -315,8 +323,8 @@ class Obj:
         self.pos = pos
         self.vel = speed
         self.acc = np.array([0.0,0.0])
-        self.rotpos = rotation_angle
-        self.rotvel = 1.0
+        self.rotpos = 0.0
+        self.rotvel = rotation_speed
         self.rotacc = 0.0
 
         self.update_x = 0.0
@@ -337,25 +345,20 @@ class Obj:
         
         self.heat = 0.0
 
-    def rotate(self, angle):
+    def rotate(self, angle,dontupdatecom=True):
         '''
         Rotate Object angle radians
         '''
-        print('rotating',self.com)
         for point in self.points:
-            print('prp:',point.rotpos)
-            print(point,end=' -> ')
-            radius = point.pos - self.com.pos
-            current_cos = radius[1]/norm(radius)
+            radius = (point.pos - self.com.pos)
+            radius = radius*norm(point.radius)/norm(radius)
             th = point.rotpos + angle
-            current_sin = radius[0]/norm(radius)
-            print('({0},{1},{2})'.format(point.rotpos,angle,th),end='')
-            point.pos[0] = norm(radius)*np.cos(th) + self.com.pos[0]
-            point.pos[1] = norm(radius)*np.sin(th) + self.com.pos[1]
+            point.pos[0] = norm(radius)*np.cos(point.rotpos+angle) + self.com.pos[0]
+            point.pos[1] = norm(radius)*np.sin(point.rotpos+angle) + self.com.pos[1]
             point.rotpos += angle
-            print(point)
-        self.rotpos += angle
-        self.com.rotpos += angle
+        if not dontupdatecom:
+            self.rotpos += angle
+            self.com.rotpos += angle
 
     def momentum(self, direction):
         return self.mass * np.dot(self.com.vel, direction)/norm(direction)
@@ -406,6 +409,7 @@ class Obj:
         
         # Use time-integrator of choice to find new x,v,a
         self.update_rotx, self.update_rotv, self.new_rotacc = self.com.move_angular(self.torques, dt)
+        self.rotate(self.update_rotx)
         for point in self.points:
 
             # Retain copy of previous step
@@ -464,7 +468,8 @@ class Point:
                 pos = np.array([0.0,0.0]),
                 speed = np.array([0.0,0.0]),
 #                forces = np.array([0.0,0.0])
-                I = 0.0
+                I = 0.0,
+                rotvel = 0.0
                 ):
         
         self.name = "point"
@@ -473,7 +478,7 @@ class Point:
         self.pos = np.array(pos, dtype=float)
         
         self.rotpos = 0.0
-        self.rotvel = 0.0
+        self.rotvel = rotvel
         self.rotacc = 0.0
 
         self.oldvel = speed
@@ -571,8 +576,9 @@ class Point:
         
         radius = norm(self.pos - obj.com.pos)
         self.pos += update_x
-        self.pos[0] += radius*(np.sin(update_rotx+self.rotpos) - np.sin(self.rotpos))
-        self.pos[1] += radius*(np.cos(update_rotx+self.rotpos) - np.cos(self.rotpos))
+        obj.rotate(update_rotx)
+        #self.pos[0] += radius*(np.sin(update_rotx+self.rotpos) - np.sin(self.rotpos))
+        #self.pos[1] += radius*(np.cos(update_rotx+self.rotpos) - np.cos(self.rotpos))
         self.vel += update_v + radius*update_rotv
         self.acc = np.array(new_acc, copy=True) + radius*new_rotacc
         
@@ -592,20 +598,20 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
-        super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_angle = rotation_angle, rotation_speed = rotation_speed)
+    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = 1.0):
+        super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
         
         self.pos = self.com.pos
         self.vel = self.com.vel
+        self.rotvel = rotation_speed
 
         if density == np.inf:
             self.com.moment_of_inertia = np.inf
             self.mass = np.inf
         else:
-            self.rotvel = 0.0
-            self.com.rotvel = 0.0
+            self.com.rotvel = rotation_speed
             self.com.moment_of_inertia = self.moment_of_inertia()
             self.mass = self.area*density
             if verbosity>1:
@@ -619,10 +625,10 @@ class Polygon(Obj):
             point.rotpos = np.arccos(point.radius[0]/norm(point.radius))
             if point.radius[1] > 0:
                 point.rotpos = 2*np.pi - point.rotpos
+            point.rotvel = rotation_speed    
             point.mass = self.mass
             # TODO: this is a kind of hacky way to differentiate 
             # fixed and unfixed polygons
-            print(density)
             if density != np.inf:
                 point.rotvel = 0.0
                 point.moment_of_inertia = self.moment_of_inertia()
@@ -709,7 +715,7 @@ class Polygon(Obj):
 
 
 class Ball(Obj):
-    def __init__(self, world = None, density = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
+    def __init__(self, world = None, density = 1, pos = np.array([0.0,0.0]), radius = 1, speed = np.array([0.0,0.0]), rotation_speed = 0.0):
         
         self.name = "circle"
 
@@ -724,8 +730,7 @@ class Ball(Obj):
         self.pos = np.array(pos, dtype=float)
         self.vel = speed
         self.acc = np.array([0.0,0.0])
-        self.rot_ang = rotation_angle
-        self.rot_spd = rotation_speed
+        self.rotvel = rotation_speed
         
         self.world = world
         if world:
@@ -737,8 +742,8 @@ class Ball(Obj):
 
 
 class FixedPolygon(Polygon):
-    def __init__(self, world = None, points = [], speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0):
-        super().__init__(world = None, density = np.inf, mass = np.inf, points = points, speed = np.array([0.0,0.0]), rotation_angle = 0.0, rotation_speed = 0.0)
+    def __init__(self, world = None, points = [], speed = np.array([0.0,0.0]), rotation_speed = 0.0):
+        super().__init__(world = None, density = np.inf, mass = np.inf, points = points, speed = np.array([0.0,0.0]), rotation_speed = 0.0)
         self.name = "fixedpolygon"        
         self.world = world
         self.mass = np.inf
