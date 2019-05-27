@@ -13,7 +13,7 @@ import config
 
 # World constants
 GRAVITY = np.array([0.0,9.8])
-TIME_DISC = .1
+TIME_DISC = .05
 
 DENSITY = .1
 EPSILON = 1e-12
@@ -93,19 +93,24 @@ class World:
         # Check there is at least one 'true' collision, AND time is stable
         if verbosity>2:
             print('in:',self.objs[0].com.pos[1])
+        if verbosity:
+            hashes = [hash(obj) for obj in self.objs]
         while max_collision_overlap > COLLISION_TOL and dt > TIME_TOL:       
             if first_iter:
                 first_iter = False
             else:
                 dt /= 2
-                for obj in self.objs:
+                for i,obj in enumerate(self.objs):
                     obj.reverse_update()
+                    if verbosity:
+                        if hash(obj) != hashes[i]:
+                            print('WRONG, dt = ',dt)
+                            print(obj)
             
             # Do first pass of position, velocity and acceleration updates for 
             # each object in the world
             for obj in self.objs:
                 #obj.forces = []
-                print('rvel:',obj.rotvel)
                 obj.pre_update(gdf, dt)
 
             # check_collisions() compiles a list of collisions with information:
@@ -119,12 +124,12 @@ class World:
                 max_collision_overlap = max(magnitudes)
             else:
                 max_collision_overlap = 0
-            if max_collision_overlap > 0:
-                if verbosity > 1:
+            if max_collision_overlap > 0:# and dt < TIME_TOL:
+                if verbosity == 1:
                     print(dt,max_collision_overlap, self.objs[0].com.pos[1])
         if dt < TIME_TOL:
             print("Warning: time became too small while still in collision.  ")
-        tries = 0
+        
         while collisions:
            
             for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
@@ -144,7 +149,7 @@ class World:
                 # objects are definitely non-overlapping after collision 
                 # resolution
                 normal_vec = unit_normal_vec * (normal_vec_mag + EPSILON)
-                if verbosity:
+                if verbosity>1:
                     print("normal vec: ", normal_vec)
                 
                 # If flag, the normal vector needs to be flipped
@@ -205,7 +210,7 @@ class World:
                     vn1 = np.dot(obj1.com.vel,unit_normal_vec)
                     vn2 = np.dot(obj2.com.vel,unit_normal_vec)
                     v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
-                    if verbosity:
+                    if verbosity>1:
                         v0a = np.copy(obj1.com.vel)
                         v0b = np.copy(obj2.com.vel)
                         print("inits", v0a,v0b)
@@ -228,7 +233,7 @@ class World:
                         point.pos -= mprop2 * (normal_vec)
                         point.vel += (v2_update - np.dot(point.vel,unit_normal_vec))*unit_normal_vec
                     obj2.finish_update()
-                    if verbosity:
+                    if verbosity>1:
                         print("inits", v0a,v0b)
                         print("a_update=",vn2, v1_update)
                         print("b_update=",vn1, v2_update)
@@ -239,10 +244,6 @@ class World:
                         #print('mafter:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
 
             collisions = self.check_collisions()
-            tries += 1
-            print(tries)
-            if tries > 10:
-                break
 
         # Do second (final) pass for each object in the world
         for obj in self.objs:
@@ -302,7 +303,7 @@ class World:
 class Obj:
     def __init__(self, points = [], world = None, mass = 1, density = 1, 
                 pos = np.array([0.0,0.0]), speed = np.array([0.0,0.0]), 
-                rotation_speed = .10):
+                rotation_speed = .00):
         
         self.cached_I = None
         self.mass = mass
@@ -401,7 +402,7 @@ class Obj:
         
         # Retain copy of previous step
         self.com.oldrotpos = np.copy(self.com.rotpos)
-        self.com.oldrotpos = np.copy(self.com.rotvel)
+        self.com.oldrotvel = np.copy(self.com.rotvel)
         self.com.oldrotacc = np.copy(self.com.rotacc)
         #print(self.com.rotvel)
         # Use time-integrator of choice to find new x,v,a
@@ -437,11 +438,18 @@ class Obj:
         self.com.pos = self.com.oldpos
         self.com.vel = self.com.oldvel
         self.com.acc = self.com.oldacc
+        
+        self.com.rotpos = self.com.oldrotpos
+        self.com.rotvel = self.com.oldrotvel
+        self.com.rotacc = self.com.oldrotacc
 
         for point in self.points:
             point.pos = point.oldpos
             point.vel = point.oldvel
             point.acc = point.oldacc 
+            point.rotpos = point.oldrotpos
+            point.rotvel = point.oldrotvel
+            point.rotacc = point.oldrotacc 
 
     def finish_update(self):
         '''
@@ -514,7 +522,8 @@ class Point:
         self.vel = v_avg + (self.acc * halfdt)
         if verbosity > 1:
             print('update', update_x)
-        if verbosity:
+        if verbosity==1:
+            print('dt:',dt)
             print('updatex:', update_x)
             print('updatev:', update_v)
             print('new acc:', new_acc)
@@ -542,7 +551,7 @@ class Point:
         self.rotvel = v_avg + (self.rotacc * halfdt)
         if verbosity > 1:
             print('update', update_x)
-        if verbosity:
+        if verbosity>1:
             print('updatex:', update_x)
             print('updatev:', update_v)
             print('new acc:', new_acc)
@@ -598,7 +607,7 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = 1.0):
+    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = .0):
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
