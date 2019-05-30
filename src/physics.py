@@ -12,9 +12,9 @@ from   math import acos,pi
 import config
 
 # World constants
-GRAVITY = np.array([0.0,9.8])
+GRAVITY = np.array([0.0,0.0])
 TIME_DISC = .05
-
+GLOBALROTSPEED = 0.0 # for testing with polygons
 DENSITY = .1
 EPSILON = 1e-12
 # 1 == perfectly elastic 
@@ -95,7 +95,11 @@ class World:
             print('in:',self.objs[0].com.pos[1])
         if verbosity:
             hashes = [hash(obj) for obj in self.objs]
+        k = 0
         while max_collision_overlap > COLLISION_TOL and dt > TIME_TOL:       
+            k+=1
+            if k == 2:print('starting collision: ', self.state // self.time_disc)
+            if k > 1:print(k,end=', ')
             if first_iter:
                 first_iter = False
             else:
@@ -115,11 +119,10 @@ class World:
 
             # check_collisions() compiles a list of collisions with information:
             #   (1,2) the two objects contained in the collision
-            #   (3) the unit vector normal to the surface of collision
-            #   (4) magnitude of normal vector
-            #   (5) a flag indicating a sign change for the normal vector
+            #   (3) the (signed) unit vector normal to the surface of collision
+            #   (4) (unsigned) magnitude of normal vector
             collisions = self.check_collisions()
-            magnitudes = [abs(magnitude) for _,__,___,magnitude,____ in collisions]
+            magnitudes = [abs(magnitude) for _,__,___,magnitude in collisions]
             if collisions:
                 max_collision_overlap = max(magnitudes)
             else:
@@ -128,11 +131,15 @@ class World:
                 if verbosity == 1:
                     print(dt,max_collision_overlap, self.objs[0].com.pos[1])
         if dt < TIME_TOL:
-            print("Warning: time became too small while still in collision.  ")
+            print("Warning: time became too small while still in collision.  ({0},{1})".format(dt,max_collision_overlap))
+            for obj in self.objs:
+                obj.reverse_update()
+            collisions = self.check_collisions()
+            
         
         while collisions:
            
-            for obj1, obj2, unit_normal_vec, normal_vec_mag, flag in collisions:
+            for obj1, obj2, unit_normal_vec, normal_vec_mag in collisions:
                 
                 # Makes things easier if the first object is never fixed
                 if obj1.is_fixed:
@@ -152,11 +159,6 @@ class World:
                 if verbosity>1:
                     print("normal vec: ", normal_vec)
                 
-                # If flag, the normal vector needs to be flipped
-                if flag == 1:
-                    normal_vec *= -1
-                    unit_normal_vec *= -1
-
 
                 # obj1 is NEVER fixed, so this branch is for a collision with a 
                 # free object and a fixed object
@@ -168,14 +170,9 @@ class World:
                 #print(obj1.is_fixed, obj2.is_fixed)
                 if obj2.is_fixed:
                     
-                    #Jpart = (obj1.mass*obj2.mass/(obj1.mass + obj2.mass))*(1+CR)
-                    #obj1.com.vel += (Jpart/obj1.mass + Jpart/obj2.mass)*(v2n - v1n)*unit_normal_vec
                     for i in range(len(obj1.points)):
                         obj1.points[i].pos += normal_vec
 
-                        ## This would work for inelastic collisions with others
-                        #obj1.points[i].vel += (Jpart/obj1.mass + Jpart/obj2.mass)*(unit_normal_vec)*(v2n - np.dot(obj1.points[i].vel,unit_normal_vec))
-                        
                         vdotN = np.dot(obj1.points[i].vel, unit_normal_vec)
                         obj1.points[i].vel -= (1+ELASTICITY)*vdotN*unit_normal_vec
 
@@ -210,15 +207,6 @@ class World:
                     vn1 = np.dot(obj1.com.vel,unit_normal_vec)
                     vn2 = np.dot(obj2.com.vel,unit_normal_vec)
                     v1_update = (mprop1 - mprop2)*vn1 + 2*mprop2*vn2
-                    if verbosity>1:
-                        v0a = np.copy(obj1.com.vel)
-                        v0b = np.copy(obj2.com.vel)
-                        print("inits", v0a,v0b)
-                        K0a = .5*obj1.mass*norm(obj1.com.vel)**2
-                        K0b = .5*obj2.mass*norm(obj2.com.vel)**2
-                        print('K0a= ', K0a)
-                        print('K0b= ', K0b)
-                        #print('mbefore:',obj1.momentum(normal_vec) , obj2.momentum(normal_vec))
                     obj1.com.vel += (v1_update - np.dot(obj1.com.vel,unit_normal_vec))*unit_normal_vec
                     for point in obj1.points:
                         point.pos += mprop1 * (normal_vec)
@@ -252,9 +240,20 @@ class World:
         
         # Update the remainder of the time step
         # ensures each frame transition is consistent time width
-        for obj in self.objs:
-            obj.pre_update(gdf, self.time_disc - dt)
-            obj.finish_update()
+        collisions = self.check_collisions()
+        if collisions:
+            print('time eval: ', self.state // self.time_disc)
+            magnitudes = [abs(magnitude) for _,__,___,magnitude in collisions]
+            print('1/2still {0} collisions (dt = {1}),{2},{3},{4}'.format(len(collisions),dt,magnitudes,collisions[0][0],collisions[0][1]))
+        if dt != self.time_disc:
+            for obj in self.objs:
+                obj.pre_update(gdf, self.time_disc - dt)
+                obj.finish_update()
+
+        collisions = self.check_collisions()
+        if collisions:
+            magnitudes = [abs(magnitude) for _,__,___,magnitude in collisions]
+            print('2/2still {0} collisions (dt = {1}),{2}'.format(len(collisions),dt,magnitudes))
         
         # Advance time
         self.state += self.time_disc
@@ -278,13 +277,15 @@ class World:
                 com_dist = norm(obj.pos - other_obj.pos)
                 if com_dist > max(obj.radius, other_obj.radius):
                     continue
+                if obj.is_fixed and other_obj.is_fixed:
+                    continue
 
                 if verbosity >= 2:
                     print([p.pos for p in obj.points])
                     print([p.pos for p in other_obj.points])
-                correction, correct_mag, flag = polypoly_collision(obj, other_obj)
+                correction, correct_mag = polypoly_collision(obj, other_obj)
                 if len(correction) > 0:
-                    collisions.append((obj, other_obj, correction, correct_mag, flag))
+                    collisions.append((obj, other_obj, correction, correct_mag))
         return collisions
 
     def __str__(self):
@@ -351,11 +352,11 @@ class Obj:
         Rotate Object angle radians
         '''
         for point in self.points:
-            radius = (point.pos - self.com.pos)
-            radius = radius*norm(point.radius)/norm(radius)
+            #radius = (point.pos - self.com.pos)
+            #radius = radius*norm(point.radius)/norm(radius)
             th = point.rotpos + angle
-            point.pos[0] = norm(radius)*np.cos(point.rotpos+angle) + self.com.pos[0]
-            point.pos[1] = norm(radius)*np.sin(point.rotpos+angle) + self.com.pos[1]
+            point.pos[0] = norm(point.radius)*np.cos(point.rotpos+angle) + self.com.pos[0]
+            point.pos[1] = norm(point.radius)*np.sin(point.rotpos+angle) + self.com.pos[1]
             point.rotpos += angle
         if not dontupdatecom:
             self.rotpos += angle
@@ -382,10 +383,8 @@ class Obj:
 
     def pre_update(self, damping_force, dt):
         '''
-        All points in the object are updated one step in accordance with the 
-        calculations done on the center of mass point.
-        The object's official position, velocity and acceleration are not updated
-        until self.finish_update().
+        COM point, and all corner points in the object are updated dt time.
+        The object's attributes are not updated until self.finish_update().
         '''
         if damping_force:
             update_x, update_v, new_acc = self.com.linear_damping_move([], dt)
@@ -583,7 +582,8 @@ class Point:
         if verbosity > 1:
             print(update_x, update_v, new_acc)
         
-        radius = norm(self.pos - obj.com.pos)
+        #radius = norm(self.pos - obj.com.pos)
+        radius = self.radius
         self.pos += update_x
         obj.rotate(update_rotx)
         #self.pos[0] += radius*(np.sin(update_rotx+self.rotpos) - np.sin(self.rotpos))
@@ -607,11 +607,10 @@ class Point:
 
 
 class Polygon(Obj):
-    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = 5.0):
+    def __init__(self, world = None, density = 1, mass = 1, points = [], speed = np.array([0.0,0.0]), rotation_speed = GLOBALROTSPEED):
         super().__init__(world = world, mass = mass, points = points, speed = speed, rotation_speed = rotation_speed)
         self.name = "polygon"
         self.num_edges = len(points)
-        
         self.pos = self.com.pos
         self.vel = self.com.vel
         self.rotvel = rotation_speed
@@ -819,7 +818,7 @@ def polypoly_collision(poly1, poly2):
             
         #If a single check fails, then there is no collision
         if poly1_bounds[1] < poly2_bounds[0]:
-            return [],None,None
+            return [],None
         
         # Save axis and overlap magnitude if this is the smallest gap
         current_overlap = poly1_bounds[1] - poly2_bounds[0]
@@ -836,7 +835,9 @@ def polypoly_collision(poly1, poly2):
     of the two objects' sides, which should be the only way a collision could
     happen, aside from some point-point intersection which is a.s. not the case.  
     '''    
-    return fix_axis, overlap, fix_mag_flag
+    if fix_mag_flag:
+        fix_axis *= -1
+    return fix_axis, overlap
     
 
 def triangle_area(pA,pB,pC):

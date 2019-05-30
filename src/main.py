@@ -9,8 +9,8 @@
 # ARGV[1] - INPUT FILE
 # ARGV[2] - NUMBER OF TIME STEPS
 # ARGV[3] - VERBOSITY (OPTIONAL)
-# ARGV[4] - ENERGY LOG (OPTIONAL)
-
+# ARGV[4] - PNG (OPTIONAL, FOR TESTING PURPOSES)
+# ARGV[5] - ENERGY LOG (OPTIONAL)
 import physics
 from sys import argv
 import subprocess
@@ -89,31 +89,31 @@ if __name__ == '__main__':
 
     # Override defaults set in config.py
     physics.verbosity = int(argv[3]) if len(argv) >= 4 else config.VERBOSITY
-    physics.energylog = int(argv[4]) if len(argv) >= 5 else config.ENERGYLOG
+    png = int(argv[4]) if len(argv) >= 5 else config.PNG
+    physics.energylog = int(argv[5]) if len(argv) >= 6 else config.ENERGYLOG
     plane = read_input(argv[1])
     processes = []
+    
     for t in range(num_iters):
         plane.update()
-        #print(t,", ")
-        #for i,obj in enumerate(plane.objs):
-        #    print(obj.name,i, obj.pos, obj.vel, obj.acc)
-        #    pass
         with open(SIMULATION_DIR + "plane_%03d.txt" % t, "w") as f:
             f.write(str(plane))
-        if t and t % 126 == 0:
-            start = time.time()
+        if png:
+            if t and t % 126 == 0:
+                start = time.time()
 
-            # Does not wait for this to finish running
-            p = subprocess.Popen(["./draw", str(t - 126), str(t), "&"] , stdin=None, stdout=None, stderr=None,)
-            processes.append(p)
+                # Does not wait for this to finish running
+                p = subprocess.Popen(["./draw", str(t - 126), str(t), "&"] , stdin=None, stdout=None, stderr=None,)
+                processes.append(p)
     
-    # Does wait for this to finish running
-    subprocess.run(["./draw", str(t - (t%126)), str(t)])
+    if png:
+        # Does wait for this to finish running
+        subprocess.run(["./draw", str(t - (t%126)), str(t)])
 
-    # If any processes are still running, wait for them since ffmpeg will fail 
-    # if all pngs are not created 
-    for p in processes:
-        p.wait()
+        # If any processes are still running, wait for them since ffmpeg will fail 
+        # if all pngs are not created 
+        for p in processes:
+            p.wait()
     
     # Lastly, display energy
     if physics.energylog:
