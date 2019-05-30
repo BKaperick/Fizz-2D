@@ -9,7 +9,7 @@ if [ $count_txts != 0 ]
 then
 rm ./simulations/*txt
 fi
-python ./src/main.py $1 $2 $3 $4
+python ./src/main.py $1 $2 $3 $4 $5
 declare pids
 # for pid in $(pgrep 'draw'); do
 #     wait "$pid"
